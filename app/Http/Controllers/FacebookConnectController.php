@@ -48,7 +48,8 @@ class FacebookConnectController extends Controller
             $expiresIn = $longLived['expires_in'] ?? null;
 
             $profile = $facebook->getUserProfile($accessToken);
-            $pages = $facebook->getUserPages($accessToken);
+            $resolved = $facebook->resolveUserPages($accessToken);
+            $pages = $resolved['pages'];
 
             DB::transaction(function () use ($request, $profile, $accessToken, $expiresIn, $pages) {
                 $account = SocialAccount::query()->updateOrCreate(
@@ -77,7 +78,7 @@ class FacebookConnectController extends Controller
                         ],
                         [
                             'social_account_id' => $account->id,
-                            'name' => $page['name'],
+                            'name' => $page['name'] ?? ('Page '.$page['id']),
                             'category' => $page['category'] ?? null,
                             'picture_url' => $page['picture']['data']['url'] ?? null,
                             'access_token' => $page['access_token'],
@@ -100,16 +101,23 @@ class FacebookConnectController extends Controller
 
             return redirect()
                 ->route('dashboard')
-                ->with('error', 'Could not connect Facebook. Check app credentials and try again.');
+                ->with('error', 'Could not connect Facebook: '.$e->getMessage());
         }
 
         $pageCount = count($pages);
+        $errorHint = count($resolved['errors'] ?? []) > 0
+            ? ' Details: '.implode(' | ', array_slice($resolved['errors'], 0, 2))
+            : '';
 
         return redirect()
             ->route('dashboard')
             ->with('success', $pageCount > 0
                 ? "Facebook connected. {$pageCount} page(s) linked."
-                : 'Facebook connected, but no Pages were found for this account.');
+                : 'Facebook connected, but no Pages were found.'.(
+                    count($resolved['page_ids'] ?? []) > 0
+                        ? ' Token has page IDs but page tokens failed.'.$errorHint
+                        : ' Token has no page grants.'.$errorHint
+                ));
     }
 
     public function syncPages(Request $request, FacebookService $facebook): RedirectResponse
@@ -125,7 +133,8 @@ class FacebookConnectController extends Controller
         }
 
         try {
-            $pages = $facebook->getUserPages($account->access_token);
+            $resolved = $facebook->resolveUserPages($account->access_token);
+            $pages = $resolved['pages'];
 
             DB::transaction(function () use ($request, $account, $pages) {
                 $seenPageIds = [];
@@ -141,7 +150,7 @@ class FacebookConnectController extends Controller
                         ],
                         [
                             'social_account_id' => $account->id,
-                            'name' => $page['name'],
+                            'name' => $page['name'] ?? ('Page '.$page['id']),
                             'category' => $page['category'] ?? null,
                             'picture_url' => $page['picture']['data']['url'] ?? null,
                             'access_token' => $page['access_token'],
@@ -162,16 +171,19 @@ class FacebookConnectController extends Controller
         } catch (Throwable $e) {
             report($e);
 
-            return redirect()->route('dashboard')->with('error', 'Could not refresh Facebook pages.');
+            return redirect()->route('dashboard')->with('error', 'Could not refresh Facebook pages: '.$e->getMessage());
         }
 
         $pageCount = count($pages);
+        $errorHint = count($resolved['errors']) > 0
+            ? ' Details: '.implode(' | ', array_slice($resolved['errors'], 0, 2))
+            : '';
 
         return redirect()
             ->route('dashboard')
-            ->with('success', $pageCount > 0
+            ->with($pageCount > 0 ? 'success' : 'error', $pageCount > 0
                 ? "Synced {$pageCount} Facebook page(s)."
-                : 'No Facebook Pages were found for this account.');
+                : 'No pages linked. IDs found: '.count($resolved['page_ids']).'.'.$errorHint);
     }
 
     public function disconnectPage(Request $request, SocialPage $page): RedirectResponse
