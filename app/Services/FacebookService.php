@@ -13,19 +13,29 @@ class FacebookService
 
     public function authorizationUrl(string $state): string
     {
-        $params = http_build_query([
+        $params = [
             'client_id' => $this->appId(),
             'redirect_uri' => $this->redirectUri(),
             'state' => $state,
-            'scope' => implode(',', [
+            'response_type' => 'code',
+        ];
+
+        $configId = config('services.facebook.config_id');
+
+        if ($configId) {
+            // Facebook Login for Business — shows Page picker via configuration.
+            $params['config_id'] = $configId;
+        } else {
+            $params['auth_type'] = 'rerequest';
+            $params['scope'] = implode(',', [
                 'pages_show_list',
                 'pages_manage_posts',
                 'pages_read_engagement',
                 'public_profile',
-            ]),
-        ]);
+            ]);
+        }
 
-        return 'https://www.facebook.com/'.self::GRAPH_VERSION.'/dialog/oauth?'.$params;
+        return 'https://www.facebook.com/'.self::GRAPH_VERSION.'/dialog/oauth?'.http_build_query($params);
     }
 
     public function exchangeCodeForToken(string $code): array

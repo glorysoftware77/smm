@@ -39,6 +39,7 @@ return [
         'client_id' => env('FACEBOOK_CLIENT_ID'),
         'client_secret' => env('FACEBOOK_CLIENT_SECRET'),
         'redirect' => env('FACEBOOK_REDIRECT_URI', env('APP_URL').'/facebook/callback'),
+        'config_id' => env('FACEBOOK_CONFIG_ID'),
     ],
 
 ];
