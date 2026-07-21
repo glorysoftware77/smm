@@ -20,6 +20,7 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/facebook/redirect', [FacebookConnectController::class, 'redirect'])->name('facebook.redirect');
     Route::get('/facebook/callback', [FacebookConnectController::class, 'callback'])->name('facebook.callback');
+    Route::post('/facebook/sync', [FacebookConnectController::class, 'syncPages'])->name('facebook.sync');
     Route::delete('/facebook/pages/{page}', [FacebookConnectController::class, 'disconnectPage'])->name('facebook.pages.disconnect');
     Route::delete('/facebook/disconnect', [FacebookConnectController::class, 'disconnectAccount'])->name('facebook.disconnect');
 });

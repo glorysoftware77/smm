@@ -84,7 +84,72 @@ class FacebookService
             throw new RuntimeException('Failed to fetch Facebook pages: '.$response->body());
         }
 
-        return $response->json('data', []);
+        $pages = $response->json('data', []);
+
+        if (count($pages) > 0) {
+            return $pages;
+        }
+
+        // Meta granular scopes: selected pages may not appear in /me/accounts.
+        return $this->getPagesFromGranularScopes($accessToken);
+    }
+
+    public function getPagesFromGranularScopes(string $accessToken): array
+    {
+        $pageIds = $this->getGrantedPageIds($accessToken);
+        $pages = [];
+
+        foreach ($pageIds as $pageId) {
+            $page = $this->getPage($pageId, $accessToken);
+
+            if ($page !== null) {
+                $pages[] = $page;
+            }
+        }
+
+        return $pages;
+    }
+
+    public function getGrantedPageIds(string $accessToken): array
+    {
+        $response = Http::get($this->graphUrl('/debug_token'), [
+            'input_token' => $accessToken,
+            'access_token' => $this->appId().'|'.$this->appSecret(),
+        ]);
+
+        if (! $response->successful()) {
+            throw new RuntimeException('Failed to debug Facebook token: '.$response->body());
+        }
+
+        $pageIds = [];
+
+        foreach ($response->json('data.granular_scopes', []) as $scope) {
+            foreach ($scope['target_ids'] ?? [] as $targetId) {
+                $pageIds[] = (string) $targetId;
+            }
+        }
+
+        return array_values(array_unique($pageIds));
+    }
+
+    public function getPage(string $pageId, string $accessToken): ?array
+    {
+        $response = Http::get($this->graphUrl('/'.$pageId), [
+            'fields' => 'id,name,access_token,category,picture{url}',
+            'access_token' => $accessToken,
+        ]);
+
+        if (! $response->successful()) {
+            return null;
+        }
+
+        $page = $response->json();
+
+        if (empty($page['id']) || empty($page['access_token'])) {
+            return null;
+        }
+
+        return $page;
     }
 
     public function generateState(): string

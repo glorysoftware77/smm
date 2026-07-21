@@ -112,6 +112,68 @@ class FacebookConnectController extends Controller
                 : 'Facebook connected, but no Pages were found for this account.');
     }
 
+    public function syncPages(Request $request, FacebookService $facebook): RedirectResponse
+    {
+        $account = SocialAccount::query()
+            ->where('user_id', $request->user()->id)
+            ->where('provider', 'facebook')
+            ->latest()
+            ->first();
+
+        if (! $account) {
+            return redirect()->route('dashboard')->with('error', 'Connect Facebook first.');
+        }
+
+        try {
+            $pages = $facebook->getUserPages($account->access_token);
+
+            DB::transaction(function () use ($request, $account, $pages) {
+                $seenPageIds = [];
+
+                foreach ($pages as $page) {
+                    $seenPageIds[] = $page['id'];
+
+                    SocialPage::query()->updateOrCreate(
+                        [
+                            'user_id' => $request->user()->id,
+                            'provider' => 'facebook',
+                            'page_id' => $page['id'],
+                        ],
+                        [
+                            'social_account_id' => $account->id,
+                            'name' => $page['name'],
+                            'category' => $page['category'] ?? null,
+                            'picture_url' => $page['picture']['data']['url'] ?? null,
+                            'access_token' => $page['access_token'],
+                            'is_connected' => true,
+                        ]
+                    );
+                }
+
+                if (count($seenPageIds) > 0) {
+                    SocialPage::query()
+                        ->where('user_id', $request->user()->id)
+                        ->where('provider', 'facebook')
+                        ->where('social_account_id', $account->id)
+                        ->whereNotIn('page_id', $seenPageIds)
+                        ->update(['is_connected' => false]);
+                }
+            });
+        } catch (Throwable $e) {
+            report($e);
+
+            return redirect()->route('dashboard')->with('error', 'Could not refresh Facebook pages.');
+        }
+
+        $pageCount = count($pages);
+
+        return redirect()
+            ->route('dashboard')
+            ->with('success', $pageCount > 0
+                ? "Synced {$pageCount} Facebook page(s)."
+                : 'No Facebook Pages were found for this account.');
+    }
+
     public function disconnectPage(Request $request, SocialPage $page): RedirectResponse
     {
         abort_unless($page->user_id === $request->user()->id, 403);
