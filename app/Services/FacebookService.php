@@ -205,6 +205,64 @@ class FacebookService
         return $page;
     }
 
+    public function publishTextPost(string $pageId, string $pageAccessToken, string $message): array
+    {
+        $response = Http::asForm()->post($this->graphUrl('/'.$pageId.'/feed'), [
+            'message' => $message,
+            'access_token' => $pageAccessToken,
+            'appsecret_proof' => $this->appSecretProof($pageAccessToken),
+        ]);
+
+        if (! $response->successful() || ! $response->json('id')) {
+            throw new RuntimeException('Failed to publish text post: '.$response->body());
+        }
+
+        return $response->json();
+    }
+
+    public function publishPhotoPost(string $pageId, string $pageAccessToken, string $filePath, string $filename, ?string $caption = null): array
+    {
+        $payload = [
+            'access_token' => $pageAccessToken,
+            'appsecret_proof' => $this->appSecretProof($pageAccessToken),
+        ];
+
+        if ($caption !== null && $caption !== '') {
+            $payload['caption'] = $caption;
+        }
+
+        $response = Http::attach('source', fopen($filePath, 'r'), $filename)
+            ->post($this->graphUrl('/'.$pageId.'/photos'), $payload);
+
+        if (! $response->successful() || (! $response->json('id') && ! $response->json('post_id'))) {
+            throw new RuntimeException('Failed to publish photo: '.$response->body());
+        }
+
+        return $response->json();
+    }
+
+    public function publishVideoPost(string $pageId, string $pageAccessToken, string $filePath, string $filename, ?string $description = null): array
+    {
+        $payload = [
+            'access_token' => $pageAccessToken,
+            'appsecret_proof' => $this->appSecretProof($pageAccessToken),
+        ];
+
+        if ($description !== null && $description !== '') {
+            $payload['description'] = $description;
+        }
+
+        $response = Http::timeout(300)
+            ->attach('source', fopen($filePath, 'r'), $filename)
+            ->post($this->graphUrl('/'.$pageId.'/videos'), $payload);
+
+        if (! $response->successful() || ! $response->json('id')) {
+            throw new RuntimeException('Failed to publish video: '.$response->body());
+        }
+
+        return $response->json();
+    }
+
     public function generateState(): string
     {
         return Str::random(40);

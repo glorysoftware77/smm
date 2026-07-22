@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FacebookConnectController;
+use App\Http\Controllers\PostController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 
@@ -23,6 +24,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/facebook/sync', [FacebookConnectController::class, 'syncPages'])->name('facebook.sync');
     Route::delete('/facebook/pages/{page}', [FacebookConnectController::class, 'disconnectPage'])->name('facebook.pages.disconnect');
     Route::delete('/facebook/disconnect', [FacebookConnectController::class, 'disconnectAccount'])->name('facebook.disconnect');
+
+    Route::get('/posts/create', [PostController::class, 'create'])->name('posts.create');
+    Route::post('/posts', [PostController::class, 'store'])->name('posts.store');
 });
 
 require __DIR__.'/auth.php';
