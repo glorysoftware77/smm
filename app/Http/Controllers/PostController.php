@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Post;
 use App\Models\SocialPage;
 use App\Services\FacebookService;
+use App\Services\InstagramService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -36,7 +37,7 @@ class PostController extends Controller
         ]);
     }
 
-    public function store(Request $request, FacebookService $facebook): RedirectResponse
+    public function store(Request $request, FacebookService $facebook, InstagramService $instagram): RedirectResponse
     {
         $validated = $request->validate([
             'social_page_id' => ['required', 'exists:social_pages,id'],
@@ -95,13 +96,13 @@ class PostController extends Controller
                 }
 
                 $result = $mediaType === 'video'
-                    ? $facebook->publishInstagramReel(
+                    ? $instagram->publishReel(
                         $page->page_id,
                         $page->access_token,
                         $publicUrl,
                         $validated['message'] ?? null
                     )
-                    : $facebook->publishInstagramImage(
+                    : $instagram->publishImage(
                         $page->page_id,
                         $page->access_token,
                         $publicUrl,

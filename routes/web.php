@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FacebookConnectController;
+use App\Http\Controllers\InstagramConnectController;
 use App\Http\Controllers\PostController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
@@ -26,6 +27,10 @@ Route::middleware('auth')->group(function () {
     Route::post('/facebook/sync', [FacebookConnectController::class, 'syncPages'])->name('facebook.sync');
     Route::delete('/facebook/pages/{page}', [FacebookConnectController::class, 'disconnectPage'])->name('facebook.pages.disconnect');
     Route::delete('/facebook/disconnect', [FacebookConnectController::class, 'disconnectAccount'])->name('facebook.disconnect');
+
+    Route::get('/instagram/redirect', [InstagramConnectController::class, 'redirect'])->name('instagram.redirect');
+    Route::get('/instagram/callback', [InstagramConnectController::class, 'callback'])->name('instagram.callback');
+    Route::delete('/instagram/disconnect', [InstagramConnectController::class, 'disconnectAccount'])->name('instagram.disconnect');
 
     Route::get('/posts/create', [PostController::class, 'create'])->name('posts.create');
     Route::post('/posts', [PostController::class, 'store'])->name('posts.store');

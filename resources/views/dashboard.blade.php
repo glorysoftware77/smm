@@ -97,16 +97,37 @@
 
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6 text-gray-900 space-y-4">
-                    <div>
-                        <h3 class="text-lg font-medium">Instagram Accounts</h3>
-                        <p class="text-sm text-gray-600 mt-1">
-                            Linked automatically from your Facebook Pages after reconnect (needs Instagram permissions).
-                        </p>
+                    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <h3 class="text-lg font-medium">Instagram Accounts</h3>
+                            <p class="text-sm text-gray-600 mt-1">
+                                Connect with Instagram Business Login (separate from Facebook).
+                            </p>
+                        </div>
+
+                        <div class="flex flex-wrap gap-2">
+                            <a href="{{ route('instagram.redirect') }}"
+                               class="inline-flex items-center px-4 py-2 bg-gray-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition">
+                                {{ $hasInstagramAccount ? 'Reconnect Instagram' : 'Connect Instagram' }}
+                            </a>
+
+                            @if ($hasInstagramAccount)
+                                <form method="POST" action="{{ route('instagram.disconnect') }}"
+                                      onsubmit="return confirm('Disconnect Instagram?');">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit"
+                                            class="inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition">
+                                        Disconnect
+                                    </button>
+                                </form>
+                            @endif
+                        </div>
                     </div>
 
                     @if ($instagramAccounts->isEmpty())
                         <p class="text-sm text-gray-500 border-t border-gray-100 pt-4">
-                            No Instagram accounts linked yet. Reconnect Facebook after adding Instagram permissions, then click Refresh Pages.
+                            No Instagram accounts linked yet.
                         </p>
                     @else
                         <ul class="divide-y divide-gray-100 border-t border-gray-100">

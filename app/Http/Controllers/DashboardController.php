@@ -28,10 +28,16 @@ class DashboardController extends Controller
             ->where('provider', 'facebook')
             ->exists();
 
+        $hasInstagramAccount = $request->user()
+            ->socialAccounts()
+            ->where('provider', 'instagram')
+            ->exists();
+
         return view('dashboard', [
             'pages' => $pages,
             'instagramAccounts' => $instagramAccounts,
             'hasFacebookAccount' => $hasFacebookAccount,
+            'hasInstagramAccount' => $hasInstagramAccount,
         ]);
     }
 }
