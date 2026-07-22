@@ -13,6 +13,9 @@ Route::get('/', function () {
         : redirect()->route('login');
 });
 
+Route::view('/privacy', 'privacy')->name('privacy');
+Route::view('/data-deletion', 'data-deletion')->name('data-deletion');
+
 Route::get('/dashboard', DashboardController::class)
     ->middleware(['auth', 'verified'])
     ->name('dashboard');
