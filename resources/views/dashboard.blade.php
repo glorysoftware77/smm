@@ -94,6 +94,53 @@
                     @endif
                 </div>
             </div>
+
+            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+                <div class="p-6 text-gray-900 space-y-4">
+                    <div>
+                        <h3 class="text-lg font-medium">Instagram Accounts</h3>
+                        <p class="text-sm text-gray-600 mt-1">
+                            Linked automatically from your Facebook Pages after reconnect (needs Instagram permissions).
+                        </p>
+                    </div>
+
+                    @if ($instagramAccounts->isEmpty())
+                        <p class="text-sm text-gray-500 border-t border-gray-100 pt-4">
+                            No Instagram accounts linked yet. Reconnect Facebook after adding Instagram permissions, then click Refresh Pages.
+                        </p>
+                    @else
+                        <ul class="divide-y divide-gray-100 border-t border-gray-100">
+                            @foreach ($instagramAccounts as $account)
+                                <li class="py-4 flex items-center justify-between gap-4">
+                                    <div class="flex items-center gap-3 min-w-0">
+                                        @if ($account->picture_url)
+                                            <img src="{{ $account->picture_url }}" alt="" class="h-10 w-10 rounded-full object-cover">
+                                        @else
+                                            <div class="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center text-sm font-medium text-gray-600">
+                                                IG
+                                            </div>
+                                        @endif
+                                        <div class="min-w-0">
+                                            <div class="font-medium text-gray-900 truncate">{{ $account->name }}</div>
+                                            <div class="text-sm text-gray-500 truncate">
+                                                Instagram · ID {{ $account->page_id }}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <form method="POST" action="{{ route('facebook.pages.disconnect', $account) }}">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="text-sm text-red-600 hover:text-red-800">
+                                            Remove
+                                        </button>
+                                    </form>
+                                </li>
+                            @endforeach
+                        </ul>
+                    @endif
+                </div>
+            </div>
         </div>
     </div>
 </x-app-layout>

@@ -31,6 +31,10 @@ class FacebookService
                 'pages_show_list',
                 'pages_manage_posts',
                 'pages_read_engagement',
+                'pages_manage_metadata',
+                'instagram_basic',
+                'instagram_content_publish',
+                'business_management',
                 'public_profile',
             ]);
         }
@@ -258,6 +262,108 @@ class FacebookService
 
         if (! $response->successful() || ! $response->json('id')) {
             throw new RuntimeException('Failed to publish video: '.$response->body());
+        }
+
+        return $response->json();
+    }
+
+    public function getInstagramBusinessAccount(string $pageId, string $pageAccessToken): ?array
+    {
+        $response = $this->graphGet('/'.$pageId, $pageAccessToken, [
+            'fields' => 'instagram_business_account{id,username,name,profile_picture_url}',
+        ]);
+
+        if (! $response->successful()) {
+            Log::warning('Failed to fetch Instagram business account', [
+                'page_id' => $pageId,
+                'body' => $response->body(),
+            ]);
+
+            return null;
+        }
+
+        return $response->json('instagram_business_account');
+    }
+
+    public function publishInstagramImage(string $igUserId, string $pageAccessToken, string $imageUrl, ?string $caption = null): array
+    {
+        $payload = [
+            'image_url' => $imageUrl,
+            'access_token' => $pageAccessToken,
+            'appsecret_proof' => $this->appSecretProof($pageAccessToken),
+        ];
+
+        if ($caption !== null && $caption !== '') {
+            $payload['caption'] = $caption;
+        }
+
+        $container = Http::asForm()->post($this->graphUrl('/'.$igUserId.'/media'), $payload);
+
+        if (! $container->successful() || ! $container->json('id')) {
+            throw new RuntimeException('Failed to create Instagram image container: '.$container->body());
+        }
+
+        return $this->publishInstagramContainer($igUserId, $pageAccessToken, $container->json('id'));
+    }
+
+    public function publishInstagramReel(string $igUserId, string $pageAccessToken, string $videoUrl, ?string $caption = null): array
+    {
+        $payload = [
+            'media_type' => 'REELS',
+            'video_url' => $videoUrl,
+            'access_token' => $pageAccessToken,
+            'appsecret_proof' => $this->appSecretProof($pageAccessToken),
+        ];
+
+        if ($caption !== null && $caption !== '') {
+            $payload['caption'] = $caption;
+        }
+
+        $container = Http::asForm()->post($this->graphUrl('/'.$igUserId.'/media'), $payload);
+
+        if (! $container->successful() || ! $container->json('id')) {
+            throw new RuntimeException('Failed to create Instagram reel container: '.$container->body());
+        }
+
+        $creationId = $container->json('id');
+        $this->waitForInstagramContainer($creationId, $pageAccessToken);
+
+        return $this->publishInstagramContainer($igUserId, $pageAccessToken, $creationId);
+    }
+
+    private function waitForInstagramContainer(string $creationId, string $pageAccessToken, int $attempts = 30): void
+    {
+        for ($i = 0; $i < $attempts; $i++) {
+            $status = $this->graphGet('/'.$creationId, $pageAccessToken, [
+                'fields' => 'status_code',
+            ]);
+
+            $code = $status->json('status_code');
+
+            if ($code === 'FINISHED') {
+                return;
+            }
+
+            if (in_array($code, ['ERROR', 'EXPIRED'], true)) {
+                throw new RuntimeException('Instagram media processing failed: '.$status->body());
+            }
+
+            sleep(2);
+        }
+
+        throw new RuntimeException('Timed out waiting for Instagram media processing.');
+    }
+
+    private function publishInstagramContainer(string $igUserId, string $pageAccessToken, string $creationId): array
+    {
+        $response = Http::asForm()->post($this->graphUrl('/'.$igUserId.'/media_publish'), [
+            'creation_id' => $creationId,
+            'access_token' => $pageAccessToken,
+            'appsecret_proof' => $this->appSecretProof($pageAccessToken),
+        ]);
+
+        if (! $response->successful() || ! $response->json('id')) {
+            throw new RuntimeException('Failed to publish Instagram media: '.$response->body());
         }
 
         return $response->json();

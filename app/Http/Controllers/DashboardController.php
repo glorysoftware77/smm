@@ -16,6 +16,13 @@ class DashboardController extends Controller
             ->orderBy('name')
             ->get();
 
+        $instagramAccounts = $request->user()
+            ->socialPages()
+            ->where('provider', 'instagram')
+            ->where('is_connected', true)
+            ->orderBy('name')
+            ->get();
+
         $hasFacebookAccount = $request->user()
             ->socialAccounts()
             ->where('provider', 'facebook')
@@ -23,6 +30,7 @@ class DashboardController extends Controller
 
         return view('dashboard', [
             'pages' => $pages,
+            'instagramAccounts' => $instagramAccounts,
             'hasFacebookAccount' => $hasFacebookAccount,
         ]);
     }

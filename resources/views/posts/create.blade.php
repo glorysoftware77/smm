@@ -31,16 +31,17 @@
                             @csrf
 
                             <div>
-                                <x-input-label for="social_page_id" :value="__('Facebook Page')" />
+                                <x-input-label for="social_page_id" :value="__('Publish to')" />
                                 <select id="social_page_id" name="social_page_id"
                                         class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"
                                         required>
                                     @foreach ($pages as $page)
                                         <option value="{{ $page->id }}" @selected(old('social_page_id') == $page->id)>
-                                            {{ $page->name }}
+                                            {{ strtoupper($page->provider) }} — {{ $page->name }}
                                         </option>
                                     @endforeach
                                 </select>
+                                <p class="mt-1 text-xs text-gray-500">Instagram requires an image or video (caption/hashtags go in Message).</p>
                                 <x-input-error :messages="$errors->get('social_page_id')" class="mt-2" />
                             </div>
 
@@ -88,7 +89,8 @@
                                     <div class="flex items-start justify-between gap-4">
                                         <div class="min-w-0">
                                             <div class="text-sm font-medium text-gray-900">
-                                                {{ $post->socialPage?->name ?? 'Page' }}
+                                                {{ strtoupper($post->socialPage?->provider ?? '') }}
+                                                {{ $post->socialPage?->name ?? 'Account' }}
                                                 <span class="ml-2 text-xs uppercase tracking-wide
                                                     @if ($post->status === 'published') text-green-700
                                                     @elseif ($post->status === 'failed') text-red-700

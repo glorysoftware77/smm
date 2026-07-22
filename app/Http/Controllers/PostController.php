@@ -17,8 +17,9 @@ class PostController extends Controller
     {
         $pages = $request->user()
             ->socialPages()
-            ->where('provider', 'facebook')
+            ->whereIn('provider', ['facebook', 'instagram'])
             ->where('is_connected', true)
+            ->orderBy('provider')
             ->orderBy('name')
             ->get();
 
@@ -39,7 +40,7 @@ class PostController extends Controller
     {
         $validated = $request->validate([
             'social_page_id' => ['required', 'exists:social_pages,id'],
-            'message' => ['nullable', 'string', 'max:5000'],
+            'message' => ['nullable', 'string', 'max:2200'],
             'image' => ['nullable', 'file', 'mimes:jpg,jpeg,png,gif,webp', 'max:10240'],
             'video' => ['nullable', 'file', 'mimes:mp4,mov,avi', 'max:102400'],
         ]);
@@ -48,25 +49,33 @@ class PostController extends Controller
             return back()->withInput()->with('error', 'Choose either an image or a video, not both.');
         }
 
-        if (! $request->filled('message') && ! $request->hasFile('image') && ! $request->hasFile('video')) {
-            return back()->withInput()->with('error', 'Add text, an image, or a video before publishing.');
-        }
-
         $page = SocialPage::query()
             ->where('id', $validated['social_page_id'])
             ->where('user_id', $request->user()->id)
             ->where('is_connected', true)
             ->firstOrFail();
 
+        $hasImage = $request->hasFile('image');
+        $hasVideo = $request->hasFile('video');
+        $hasMessage = $request->filled('message');
+
+        if ($page->provider === 'instagram' && ! $hasImage && ! $hasVideo) {
+            return back()->withInput()->with('error', 'Instagram requires an image or video. Text-only posts are not supported.');
+        }
+
+        if ($page->provider === 'facebook' && ! $hasMessage && ! $hasImage && ! $hasVideo) {
+            return back()->withInput()->with('error', 'Add text, an image, or a video before publishing.');
+        }
+
         $mediaType = 'none';
         $mediaPath = null;
 
-        if ($request->hasFile('image')) {
+        if ($hasImage) {
             $mediaType = 'image';
-            $mediaPath = $request->file('image')->store('posts/'.$request->user()->id, 'local');
-        } elseif ($request->hasFile('video')) {
+            $mediaPath = $request->file('image')->store('posts/'.$request->user()->id, 'public');
+        } elseif ($hasVideo) {
             $mediaType = 'video';
-            $mediaPath = $request->file('video')->store('posts/'.$request->user()->id, 'local');
+            $mediaPath = $request->file('video')->store('posts/'.$request->user()->id, 'public');
         }
 
         $post = Post::query()->create([
@@ -79,27 +88,52 @@ class PostController extends Controller
         ]);
 
         try {
-            $result = match ($mediaType) {
-                'image' => $facebook->publishPhotoPost(
-                    $page->page_id,
-                    $page->access_token,
-                    Storage::disk('local')->path($mediaPath),
-                    basename($mediaPath),
-                    $validated['message'] ?? null
-                ),
-                'video' => $facebook->publishVideoPost(
-                    $page->page_id,
-                    $page->access_token,
-                    Storage::disk('local')->path($mediaPath),
-                    basename($mediaPath),
-                    $validated['message'] ?? null
-                ),
-                default => $facebook->publishTextPost(
-                    $page->page_id,
-                    $page->access_token,
-                    (string) $validated['message']
-                ),
-            };
+            if ($page->provider === 'instagram') {
+                $publicUrl = Storage::disk('public')->url($mediaPath);
+                if (! str_starts_with($publicUrl, 'http')) {
+                    $publicUrl = rtrim(config('app.url'), '/').$publicUrl;
+                }
+
+                $result = $mediaType === 'video'
+                    ? $facebook->publishInstagramReel(
+                        $page->page_id,
+                        $page->access_token,
+                        $publicUrl,
+                        $validated['message'] ?? null
+                    )
+                    : $facebook->publishInstagramImage(
+                        $page->page_id,
+                        $page->access_token,
+                        $publicUrl,
+                        $validated['message'] ?? null
+                    );
+            } else {
+                $absolutePath = $mediaPath
+                    ? Storage::disk('public')->path($mediaPath)
+                    : null;
+
+                $result = match ($mediaType) {
+                    'image' => $facebook->publishPhotoPost(
+                        $page->page_id,
+                        $page->access_token,
+                        $absolutePath,
+                        basename($mediaPath),
+                        $validated['message'] ?? null
+                    ),
+                    'video' => $facebook->publishVideoPost(
+                        $page->page_id,
+                        $page->access_token,
+                        $absolutePath,
+                        basename($mediaPath),
+                        $validated['message'] ?? null
+                    ),
+                    default => $facebook->publishTextPost(
+                        $page->page_id,
+                        $page->access_token,
+                        (string) $validated['message']
+                    ),
+                };
+            }
 
             $facebookPostId = $result['post_id'] ?? $result['id'] ?? null;
 

@@ -51,7 +51,7 @@ class FacebookConnectController extends Controller
             $resolved = $facebook->resolveUserPages($accessToken);
             $pages = $resolved['pages'];
 
-            DB::transaction(function () use ($request, $profile, $accessToken, $expiresIn, $pages) {
+            DB::transaction(function () use ($request, $profile, $accessToken, $expiresIn, $pages, $facebook) {
                 $account = SocialAccount::query()->updateOrCreate(
                     [
                         'user_id' => $request->user()->id,
@@ -65,36 +65,8 @@ class FacebookConnectController extends Controller
                     ]
                 );
 
-                $seenPageIds = [];
-
-                foreach ($pages as $page) {
-                    $seenPageIds[] = $page['id'];
-
-                    SocialPage::query()->updateOrCreate(
-                        [
-                            'user_id' => $request->user()->id,
-                            'provider' => 'facebook',
-                            'page_id' => $page['id'],
-                        ],
-                        [
-                            'social_account_id' => $account->id,
-                            'name' => $page['name'] ?? ('Page '.$page['id']),
-                            'category' => $page['category'] ?? null,
-                            'picture_url' => $page['picture']['data']['url'] ?? null,
-                            'access_token' => $page['access_token'],
-                            'is_connected' => true,
-                        ]
-                    );
-                }
-
-                if (count($seenPageIds) > 0) {
-                    SocialPage::query()
-                        ->where('user_id', $request->user()->id)
-                        ->where('provider', 'facebook')
-                        ->where('social_account_id', $account->id)
-                        ->whereNotIn('page_id', $seenPageIds)
-                        ->update(['is_connected' => false]);
-                }
+                $this->storeFacebookPages($request->user()->id, $account->id, $pages);
+                $this->syncInstagramAccounts($request->user()->id, $account->id, $facebook);
             });
         } catch (Throwable $e) {
             report($e);
@@ -105,6 +77,12 @@ class FacebookConnectController extends Controller
         }
 
         $pageCount = count($pages);
+        $igCount = SocialPage::query()
+            ->where('user_id', $request->user()->id)
+            ->where('provider', 'instagram')
+            ->where('is_connected', true)
+            ->count();
+
         $errorHint = count($resolved['errors'] ?? []) > 0
             ? ' Details: '.implode(' | ', array_slice($resolved['errors'], 0, 2))
             : '';
@@ -112,7 +90,7 @@ class FacebookConnectController extends Controller
         return redirect()
             ->route('dashboard')
             ->with('success', $pageCount > 0
-                ? "Facebook connected. {$pageCount} page(s) linked."
+                ? "Connected {$pageCount} Facebook page(s) and {$igCount} Instagram account(s)."
                 : 'Facebook connected, but no Pages were found.'.(
                     count($resolved['page_ids'] ?? []) > 0
                         ? ' Token has page IDs but page tokens failed.'.$errorHint
@@ -136,45 +114,23 @@ class FacebookConnectController extends Controller
             $resolved = $facebook->resolveUserPages($account->access_token);
             $pages = $resolved['pages'];
 
-            DB::transaction(function () use ($request, $account, $pages) {
-                $seenPageIds = [];
-
-                foreach ($pages as $page) {
-                    $seenPageIds[] = $page['id'];
-
-                    SocialPage::query()->updateOrCreate(
-                        [
-                            'user_id' => $request->user()->id,
-                            'provider' => 'facebook',
-                            'page_id' => $page['id'],
-                        ],
-                        [
-                            'social_account_id' => $account->id,
-                            'name' => $page['name'] ?? ('Page '.$page['id']),
-                            'category' => $page['category'] ?? null,
-                            'picture_url' => $page['picture']['data']['url'] ?? null,
-                            'access_token' => $page['access_token'],
-                            'is_connected' => true,
-                        ]
-                    );
-                }
-
-                if (count($seenPageIds) > 0) {
-                    SocialPage::query()
-                        ->where('user_id', $request->user()->id)
-                        ->where('provider', 'facebook')
-                        ->where('social_account_id', $account->id)
-                        ->whereNotIn('page_id', $seenPageIds)
-                        ->update(['is_connected' => false]);
-                }
+            DB::transaction(function () use ($request, $account, $pages, $facebook) {
+                $this->storeFacebookPages($request->user()->id, $account->id, $pages);
+                $this->syncInstagramAccounts($request->user()->id, $account->id, $facebook);
             });
         } catch (Throwable $e) {
             report($e);
 
-            return redirect()->route('dashboard')->with('error', 'Could not refresh Facebook pages: '.$e->getMessage());
+            return redirect()->route('dashboard')->with('error', 'Could not refresh pages: '.$e->getMessage());
         }
 
         $pageCount = count($pages);
+        $igCount = SocialPage::query()
+            ->where('user_id', $request->user()->id)
+            ->where('provider', 'instagram')
+            ->where('is_connected', true)
+            ->count();
+
         $errorHint = count($resolved['errors']) > 0
             ? ' Details: '.implode(' | ', array_slice($resolved['errors'], 0, 2))
             : '';
@@ -182,7 +138,7 @@ class FacebookConnectController extends Controller
         return redirect()
             ->route('dashboard')
             ->with($pageCount > 0 ? 'success' : 'error', $pageCount > 0
-                ? "Synced {$pageCount} Facebook page(s)."
+                ? "Synced {$pageCount} Facebook page(s) and {$igCount} Instagram account(s)."
                 : 'No pages linked. IDs found: '.count($resolved['page_ids']).'.'.$errorHint);
     }
 
@@ -191,6 +147,14 @@ class FacebookConnectController extends Controller
         abort_unless($page->user_id === $request->user()->id, 403);
 
         $page->update(['is_connected' => false]);
+
+        if ($page->provider === 'facebook') {
+            SocialPage::query()
+                ->where('user_id', $request->user()->id)
+                ->where('provider', 'instagram')
+                ->where('linked_social_page_id', $page->id)
+                ->update(['is_connected' => false]);
+        }
 
         return redirect()->route('dashboard')->with('success', "Disconnected {$page->name}.");
     }
@@ -203,5 +167,92 @@ class FacebookConnectController extends Controller
             ->delete();
 
         return redirect()->route('dashboard')->with('success', 'Facebook account disconnected.');
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $pages
+     */
+    private function storeFacebookPages(int $userId, int $accountId, array $pages): void
+    {
+        $seenPageIds = [];
+
+        foreach ($pages as $page) {
+            $seenPageIds[] = $page['id'];
+
+            SocialPage::query()->updateOrCreate(
+                [
+                    'user_id' => $userId,
+                    'provider' => 'facebook',
+                    'page_id' => $page['id'],
+                ],
+                [
+                    'social_account_id' => $accountId,
+                    'name' => $page['name'] ?? ('Page '.$page['id']),
+                    'category' => $page['category'] ?? null,
+                    'picture_url' => $page['picture']['data']['url'] ?? null,
+                    'access_token' => $page['access_token'],
+                    'is_connected' => true,
+                ]
+            );
+        }
+
+        if (count($seenPageIds) > 0) {
+            SocialPage::query()
+                ->where('user_id', $userId)
+                ->where('provider', 'facebook')
+                ->where('social_account_id', $accountId)
+                ->whereNotIn('page_id', $seenPageIds)
+                ->update(['is_connected' => false]);
+        }
+    }
+
+    private function syncInstagramAccounts(int $userId, int $accountId, FacebookService $facebook): void
+    {
+        $facebookPages = SocialPage::query()
+            ->where('user_id', $userId)
+            ->where('provider', 'facebook')
+            ->where('is_connected', true)
+            ->get();
+
+        $seenIgIds = [];
+
+        foreach ($facebookPages as $facebookPage) {
+            $ig = $facebook->getInstagramBusinessAccount($facebookPage->page_id, $facebookPage->access_token);
+
+            if (! $ig || empty($ig['id'])) {
+                continue;
+            }
+
+            $seenIgIds[] = $ig['id'];
+            $username = $ig['username'] ?? null;
+
+            SocialPage::query()->updateOrCreate(
+                [
+                    'user_id' => $userId,
+                    'provider' => 'instagram',
+                    'page_id' => $ig['id'],
+                ],
+                [
+                    'social_account_id' => $accountId,
+                    'linked_social_page_id' => $facebookPage->id,
+                    'name' => $username ? '@'.$username : ($ig['name'] ?? 'Instagram'),
+                    'category' => 'Instagram',
+                    'picture_url' => $ig['profile_picture_url'] ?? null,
+                    'access_token' => $facebookPage->access_token,
+                    'is_connected' => true,
+                ]
+            );
+        }
+
+        $query = SocialPage::query()
+            ->where('user_id', $userId)
+            ->where('provider', 'instagram')
+            ->where('social_account_id', $accountId);
+
+        if (count($seenIgIds) > 0) {
+            $query->whereNotIn('page_id', $seenIgIds)->update(['is_connected' => false]);
+        } else {
+            $query->update(['is_connected' => false]);
+        }
     }
 }

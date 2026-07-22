@@ -10,6 +10,7 @@ class SocialPage extends Model
     protected $fillable = [
         'user_id',
         'social_account_id',
+        'linked_social_page_id',
         'provider',
         'page_id',
         'name',
@@ -35,5 +36,10 @@ class SocialPage extends Model
     public function socialAccount(): BelongsTo
     {
         return $this->belongsTo(SocialAccount::class);
+    }
+
+    public function linkedSocialPage(): BelongsTo
+    {
+        return $this->belongsTo(SocialPage::class, 'linked_social_page_id');
     }
 }
