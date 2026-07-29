@@ -185,13 +185,13 @@ class PostController extends Controller
 
         if ($post->socialPage?->provider !== 'facebook') {
             return redirect()
-                ->route('posts.create')
+                ->route('insights.index', ['platform' => $post->socialPage?->provider ?? 'facebook'])
                 ->with('error', 'Insights refresh is currently available for Facebook posts only.');
         }
 
         if ($post->status !== 'published') {
             return redirect()
-                ->route('posts.create')
+                ->route('insights.index')
                 ->with('error', 'Only published posts can fetch insights.');
         }
 
@@ -212,7 +212,7 @@ class PostController extends Controller
 
         if ($candidates === []) {
             return redirect()
-                ->route('posts.create')
+                ->route('insights.index')
                 ->with('error', 'No Facebook post/video ID stored for this item.');
         }
 
@@ -237,7 +237,7 @@ class PostController extends Controller
             }
 
             return redirect()
-                ->route('posts.create')
+                ->route('insights.index')
                 ->with('error', 'Insights not available yet'.($lastError ? ': '.$lastError->getMessage() : '.'));
         }
 
@@ -247,7 +247,7 @@ class PostController extends Controller
         ]);
 
         return redirect()
-            ->route('posts.create')
+            ->route('insights.index')
             ->with('success', 'Insights updated for your Facebook post.');
     }
 }

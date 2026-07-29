@@ -92,7 +92,12 @@
             @if ($recentPosts->isNotEmpty())
                 <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                     <div class="p-6 text-gray-900 space-y-4">
-                        <h3 class="text-lg font-medium">Recent posts</h3>
+                        <div class="flex items-center justify-between gap-3">
+                            <h3 class="text-lg font-medium">Recent posts</h3>
+                            <a href="{{ route('insights.index') }}" class="text-sm text-indigo-600 hover:text-indigo-800">
+                                View Insights →
+                            </a>
+                        </div>
                         <ul class="divide-y divide-gray-100">
                             @foreach ($recentPosts as $post)
                                 <li class="py-4">
@@ -117,60 +122,17 @@
                                             <p class="mt-1 text-sm text-gray-600 whitespace-pre-line">
                                                 {{ \Illuminate\Support\Str::limit($post->message ?: '['.$post->media_type.']', 160) }}
                                             </p>
-                                            @if ($post->facebook_post_id || $post->facebook_video_id)
-                                                <p class="mt-1 text-xs text-gray-400">
-                                                    @if ($post->facebook_post_id) Post: {{ $post->facebook_post_id }} @endif
-                                                    @if ($post->facebook_video_id) · Video: {{ $post->facebook_video_id }} @endif
-                                                </p>
-                                            @endif
                                             @if ($post->error_message)
                                                 <p class="mt-1 text-xs text-red-600">{{ \Illuminate\Support\Str::limit($post->error_message, 200) }}</p>
                                             @endif
-
-                                            @if (!empty($post->insights))
-                                                <div class="mt-2 flex flex-wrap gap-3 text-xs text-gray-600">
-                                                    @foreach ([
-                                                        'post_media_view' => 'Views',
-                                                        'post_total_media_view_unique' => 'Reach',
-                                                        'views_from_followers' => 'From followers',
-                                                        'views_from_non_followers' => 'From non-followers',
-                                                        'post_video_views' => 'Video views',
-                                                        'post_video_views_unique' => 'Unique video views',
-                                                        'post_video_avg_time_watched' => 'Avg watch (ms)',
-                                                        'post_clicks' => 'Clicks',
-                                                    ] as $key => $label)
-                                                        @if (is_numeric($post->insightValue($key)))
-                                                            <span class="inline-flex items-center rounded bg-gray-100 px-2 py-1">
-                                                                {{ $label }}: <strong class="ml-1">{{ number_format((float) $post->insightValue($key)) }}</strong>
-                                                            </span>
-                                                        @endif
-                                                    @endforeach
-                                                </div>
-                                                @if ($post->insights_fetched_at)
-                                                    <p class="mt-1 text-xs text-gray-400">Updated {{ $post->insights_fetched_at->diffForHumans() }}</p>
-                                                @endif
-                                            @endif
                                         </div>
-                                        <div class="text-right space-y-2 whitespace-nowrap">
-                                            <div class="text-xs text-gray-400">
-                                                {{ $post->created_at?->diffForHumans() }}
-                                            </div>
-                                            @if ($post->status === 'published' && $post->socialPage?->provider === 'facebook')
-                                                <form method="POST" action="{{ route('posts.insights.refresh', $post) }}">
-                                                    @csrf
-                                                    <button type="submit" class="text-xs text-indigo-600 hover:text-indigo-800">
-                                                        Refresh insights
-                                                    </button>
-                                                </form>
-                                            @endif
+                                        <div class="text-right whitespace-nowrap text-xs text-gray-400">
+                                            {{ $post->created_at?->diffForHumans() }}
                                         </div>
                                     </div>
                                 </li>
                             @endforeach
                         </ul>
-                        <p class="text-xs text-gray-500">
-                            Tip: Facebook insights can take time to appear after publishing. Wait a bit, then click Refresh insights.
-                        </p>
                     </div>
                 </div>
             @endif

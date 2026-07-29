@@ -365,6 +365,67 @@ class FacebookService
     }
 
     /**
+     * Page-level summary metrics (followers / follows / views).
+     *
+     * @return array<string, mixed>
+     */
+    public function getPageSummaryInsights(string $pageId, string $pageAccessToken): array
+    {
+        $collected = [];
+
+        // Lifetime / current follower count via Page fields.
+        $page = Http::get($this->graphUrl('/'.$pageId), [
+            'fields' => 'followers_count,fan_count,name',
+            'access_token' => $pageAccessToken,
+            'appsecret_proof' => $this->appSecretProof($pageAccessToken),
+        ]);
+
+        if ($page->successful()) {
+            $collected['followers_count'] = $page->json('followers_count') ?? $page->json('fan_count');
+            $collected['page_name'] = $page->json('name');
+        }
+
+        $dayMetrics = [
+            'page_follows',
+            'page_daily_follows',
+            'page_daily_follows_unique',
+            'page_media_view',
+            'page_total_media_view_unique',
+            'page_views_total',
+            'page_post_engagements',
+        ];
+
+        foreach ($dayMetrics as $metric) {
+            $response = $this->insightsRequest($pageId, $pageAccessToken, [
+                'metric' => $metric,
+                'period' => 'day',
+            ]);
+
+            if (! $response->successful()) {
+                continue;
+            }
+
+            foreach ($response->json('data', []) as $row) {
+                $name = $row['name'] ?? null;
+                $values = $row['values'] ?? [];
+
+                if (! $name || $values === []) {
+                    continue;
+                }
+
+                $latest = end($values);
+                $value = $latest['value'] ?? null;
+
+                if (is_numeric($value)) {
+                    $collected[$name] = $value;
+                }
+            }
+        }
+
+        return $collected;
+    }
+
+    /**
      * Requests metrics together, then one-by-one so a single invalid metric
      * does not fail the whole request.
      *

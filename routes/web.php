@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FacebookConnectController;
+use App\Http\Controllers\InsightsController;
 use App\Http\Controllers\InstagramConnectController;
 use App\Http\Controllers\PostController;
 use App\Http\Controllers\ProfileController;
@@ -38,6 +39,10 @@ Route::middleware('auth')->group(function () {
     Route::get('/posts/create', [PostController::class, 'create'])->name('posts.create');
     Route::post('/posts', [PostController::class, 'store'])->name('posts.store');
     Route::post('/posts/{post}/insights', [PostController::class, 'refreshInsights'])->name('posts.insights.refresh');
+
+    Route::get('/insights', [InsightsController::class, 'index'])->name('insights.index');
+    Route::post('/insights/refresh', [InsightsController::class, 'refreshAll'])->name('insights.refresh');
+    Route::post('/insights/posts/{post}', [InsightsController::class, 'refreshPost'])->name('insights.posts.refresh');
 });
 
 require __DIR__.'/auth.php';
