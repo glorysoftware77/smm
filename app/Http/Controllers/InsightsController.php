@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Post;
 use App\Services\FacebookService;
+use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -16,11 +17,18 @@ class InsightsController extends Controller
      */
     private const AUTO_FETCH_BUDGET_SECONDS = 12;
 
+    /** @var array<int, string> */
+    private const RANGES = [7, 28, 90];
+
+    private const DEFAULT_RANGE = 28;
+
     public function index(Request $request, FacebookService $facebook): View
     {
         $platform = $this->platform($request->string('platform')->toString());
+        $range = $this->range($request->integer('range', self::DEFAULT_RANGE));
+        [$from, $to] = $this->rangeBounds($range);
 
-        $posts = $this->publishedPosts($request, $platform, 60);
+        $posts = $this->publishedPosts($request, $platform, $from, $to, 100);
 
         if ($platform === 'facebook') {
             $this->autoFetchMissingInsights($posts, $facebook);
@@ -28,21 +36,27 @@ class InsightsController extends Controller
 
         return view('insights.index', [
             'platform' => $platform,
+            'range' => $range,
+            'rangeFrom' => $from,
+            'rangeTo' => $to,
+            'ranges' => self::RANGES,
             'posts' => $posts,
             'summary' => $this->buildSummary($posts),
-            'page' => $this->pageSummary($request, $platform, $facebook),
+            'page' => $this->pageSummary($request, $platform, $facebook, $from, $to),
         ]);
     }
 
     public function refreshAll(Request $request, FacebookService $facebook): RedirectResponse
     {
         $platform = $this->platform($request->string('platform')->toString());
+        $range = $this->range($request->integer('range', self::DEFAULT_RANGE));
 
         if ($platform !== 'facebook') {
-            return $this->back($platform, 'error', 'Bulk refresh is available for Facebook only right now.');
+            return $this->back($platform, $range, 'error', 'Bulk refresh is available for Facebook only right now.');
         }
 
-        $posts = $this->publishedPosts($request, 'facebook', 30);
+        [$from, $to] = $this->rangeBounds($range);
+        $posts = $this->publishedPosts($request, 'facebook', $from, $to, 50);
 
         $updated = 0;
         $failed = 0;
@@ -56,7 +70,7 @@ class InsightsController extends Controller
             }
         }
 
-        return $this->back('facebook', 'success', "Refreshed {$updated} post(s)".($failed ? ", {$failed} not ready yet." : '.'));
+        return $this->back('facebook', $range, 'success', "Refreshed {$updated} post(s)".($failed ? ", {$failed} not ready yet." : '.'));
     }
 
     public function refreshPost(Request $request, Post $post, FacebookService $facebook): RedirectResponse
@@ -64,21 +78,22 @@ class InsightsController extends Controller
         abort_unless($post->user_id === $request->user()->id, 403);
 
         $platform = $post->socialPage?->provider ?? 'facebook';
+        $range = $this->range($request->integer('range', self::DEFAULT_RANGE));
 
         if ($platform !== 'facebook') {
-            return $this->back($platform, 'error', 'Insights refresh is currently available for Facebook posts only.');
+            return $this->back($platform, $range, 'error', 'Insights refresh is currently available for Facebook posts only.');
         }
 
         try {
             $ok = $this->refreshPostInsights($post, $facebook);
 
-            return $this->back('facebook', $ok ? 'success' : 'error', $ok
+            return $this->back('facebook', $range, $ok ? 'success' : 'error', $ok
                 ? 'Insights updated.'
                 : 'Insights not available yet for this post.');
         } catch (Throwable $e) {
             report($e);
 
-            return $this->back('facebook', 'error', 'Insights failed: '.$e->getMessage());
+            return $this->back('facebook', $range, 'error', 'Insights failed: '.$e->getMessage());
         }
     }
 
@@ -87,24 +102,48 @@ class InsightsController extends Controller
         return in_array($value, ['facebook', 'instagram'], true) ? $value : 'facebook';
     }
 
-    private function back(string $platform, string $key, string $message): RedirectResponse
+    private function range(int $value): int
+    {
+        return in_array($value, self::RANGES, true) ? $value : self::DEFAULT_RANGE;
+    }
+
+    /**
+     * @return array{0: Carbon, 1: Carbon}
+     */
+    private function rangeBounds(int $days): array
+    {
+        $to = now()->endOfDay();
+        $from = now()->subDays($days - 1)->startOfDay();
+
+        return [$from, $to];
+    }
+
+    private function back(string $platform, int $range, string $key, string $message): RedirectResponse
     {
         return redirect()
-            ->route('insights.index', ['platform' => $platform])
+            ->route('insights.index', ['platform' => $platform, 'range' => $range])
             ->with($key, $message);
     }
 
     /**
      * @return \Illuminate\Database\Eloquent\Collection<int, Post>
      */
-    private function publishedPosts(Request $request, string $platform, int $limit)
+    private function publishedPosts(Request $request, string $platform, Carbon $from, Carbon $to, int $limit)
     {
         return $request->user()
             ->posts()
             ->with('socialPage')
             ->where('status', 'published')
             ->whereHas('socialPage', fn ($query) => $query->where('provider', $platform))
-            ->latest()
+            ->where(function ($query) use ($from, $to) {
+                $query->whereBetween('published_at', [$from, $to])
+                    ->orWhere(function ($inner) use ($from, $to) {
+                        $inner->whereNull('published_at')
+                            ->whereBetween('created_at', [$from, $to]);
+                    });
+            })
+            ->latest('published_at')
+            ->latest('created_at')
             ->limit($limit)
             ->get();
     }
@@ -168,7 +207,7 @@ class InsightsController extends Controller
     /**
      * @return array<string, mixed>|null
      */
-    private function pageSummary(Request $request, string $platform, FacebookService $facebook): ?array
+    private function pageSummary(Request $request, string $platform, FacebookService $facebook, Carbon $from, Carbon $to): ?array
     {
         if ($platform !== 'facebook') {
             return null;
@@ -188,10 +227,18 @@ class InsightsController extends Controller
         $data = ['name' => $page->name, 'followers' => null, 'new_follows' => null, 'page_views' => null];
 
         try {
-            $insights = $facebook->getPageSummaryInsights($page->page_id, $page->access_token);
+            $insights = $facebook->getPageSummaryInsights(
+                $page->page_id,
+                $page->access_token,
+                $from->timestamp,
+                $to->timestamp,
+            );
 
-            $data['followers'] = $insights['followers_count'] ?? $insights['page_follows'] ?? null;
-            $data['new_follows'] = $insights['page_daily_follows_unique'] ?? $insights['page_daily_follows'] ?? null;
+            $data['followers'] = $insights['followers_count'] ?? null;
+            $data['new_follows'] = $insights['page_daily_follows_unique']
+                ?? $insights['page_daily_follows']
+                ?? $insights['page_follows']
+                ?? null;
             $data['page_views'] = $insights['page_views_total'] ?? $insights['page_media_view'] ?? null;
         } catch (Throwable $e) {
             report($e);

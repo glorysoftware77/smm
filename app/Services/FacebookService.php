@@ -415,7 +415,7 @@ class FacebookService
      *
      * @return array<string, mixed>
      */
-    public function getPageSummaryInsights(string $pageId, string $pageAccessToken): array
+    public function getPageSummaryInsights(string $pageId, string $pageAccessToken, ?int $since = null, ?int $until = null): array
     {
         $collected = [];
 
@@ -442,10 +442,17 @@ class FacebookService
         ];
 
         foreach ($dayMetrics as $metric) {
-            $response = $this->insightsRequest($pageId, $pageAccessToken, [
+            $query = [
                 'metric' => $metric,
                 'period' => 'day',
-            ]);
+            ];
+
+            if ($since !== null && $until !== null) {
+                $query['since'] = $since;
+                $query['until'] = $until;
+            }
+
+            $response = $this->insightsRequest($pageId, $pageAccessToken, $query);
 
             if (! $response->successful()) {
                 continue;
@@ -459,11 +466,25 @@ class FacebookService
                     continue;
                 }
 
-                $latest = end($values);
-                $value = $latest['value'] ?? null;
+                $sum = 0;
+                $hasNumeric = false;
 
-                if (is_numeric($value)) {
-                    $collected[$name] = $value;
+                foreach ($values as $entry) {
+                    $value = $entry['value'] ?? null;
+
+                    if (! is_numeric($value)) {
+                        continue;
+                    }
+
+                    $sum += (float) $value;
+                    $hasNumeric = true;
+                }
+
+                if ($hasNumeric) {
+                    // For ranged requests, sum daily values; otherwise keep latest day.
+                    $collected[$name] = ($since !== null && $until !== null)
+                        ? $sum
+                        : (float) (end($values)['value'] ?? $sum);
                 }
             }
         }

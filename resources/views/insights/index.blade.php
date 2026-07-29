@@ -16,17 +16,28 @@
             <div class="flex items-center gap-2">
                 <div class="inline-flex rounded-md border border-gray-300 bg-white p-0.5">
                     @foreach ($tabs as $key => $label)
-                        <a href="{{ route('insights.index', ['platform' => $key]) }}"
+                        <a href="{{ route('insights.index', ['platform' => $key, 'range' => $range]) }}"
                            class="px-3 py-1.5 text-sm rounded {{ $platform === $key ? 'bg-gray-900 text-white' : 'text-gray-600 hover:text-gray-900' }}">
                             {{ $label }}
                         </a>
                     @endforeach
                 </div>
 
+                <select onchange="window.location.href=this.value"
+                        class="rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    @foreach ($ranges as $days)
+                        <option value="{{ route('insights.index', ['platform' => $platform, 'range' => $days]) }}"
+                                @selected($range === $days)>
+                            Last {{ $days }} days
+                        </option>
+                    @endforeach
+                </select>
+
                 @if ($platform === 'facebook')
                     <form method="POST" action="{{ route('insights.refresh') }}">
                         @csrf
                         <input type="hidden" name="platform" value="facebook">
+                        <input type="hidden" name="range" value="{{ $range }}">
                         <button type="submit"
                                 class="rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">
                             Refresh all
@@ -35,6 +46,9 @@
                 @endif
             </div>
         </div>
+        <p class="mt-2 text-sm text-gray-500">
+            {{ $rangeFrom->format('j M Y') }} – {{ $rangeTo->format('j M Y') }}
+        </p>
     </x-slot>
 
     <div class="py-6">
@@ -69,13 +83,13 @@
                     <span class="text-gray-500">Page followers:
                         <strong class="text-gray-900">{{ $fmt($page['followers']) }}</strong>
                     </span>
-                    <span class="text-gray-500">New follows:
+                    <span class="text-gray-500">New follows ({{ $range }}d):
                         <strong class="text-gray-900">{{ $fmt($page['new_follows']) }}</strong>
                     </span>
-                    <span class="text-gray-500">Page views:
+                    <span class="text-gray-500">Page views ({{ $range }}d):
                         <strong class="text-gray-900">{{ $fmt($page['page_views']) }}</strong>
                     </span>
-                    <span class="text-gray-400">{{ $summary['with_insights'] }}/{{ $summary['total'] }} posts with data</span>
+                    <span class="text-gray-400">{{ $summary['with_insights'] }}/{{ $summary['total'] }} posts in range</span>
                 </div>
             @endif
 
@@ -146,6 +160,7 @@
                                     <td class="px-3 py-3 text-right">
                                         <form method="POST" action="{{ route('insights.posts.refresh', $post) }}">
                                             @csrf
+                                            <input type="hidden" name="range" value="{{ $range }}">
                                             <button type="submit" class="text-xs text-indigo-600 hover:text-indigo-800">Refresh</button>
                                         </form>
                                     </td>
@@ -183,6 +198,7 @@
 
                             <form method="POST" action="{{ route('insights.posts.refresh', $post) }}" class="mt-3 text-right">
                                 @csrf
+                                <input type="hidden" name="range" value="{{ $range }}">
                                 <button type="submit" class="text-xs text-indigo-600">Refresh</button>
                             </form>
                         </div>
@@ -191,7 +207,7 @@
             @endif
 
             <p class="text-xs text-gray-400">
-                Views come from Meta Page Insights and can lag a few hours. Reactions, comments and shares update immediately.
+                Showing posts published in the selected range. Per-post views are lifetime for that post; page follows/views are summed for the range.
             </p>
         </div>
     </div>
