@@ -354,14 +354,60 @@ class FacebookService
     {
         $insights = $this->fetchInsightMetrics($objectId, $pageAccessToken, self::POST_INSIGHT_METRICS);
         $followerSplit = $this->fetchFollowerBreakdown($objectId, $pageAccessToken);
+        $engagement = $this->fetchPostEngagement($objectId, $pageAccessToken);
 
-        $merged = array_merge($insights, $followerSplit);
+        $merged = array_merge($insights, $followerSplit, $engagement);
 
         if ($merged === []) {
             throw new RuntimeException('Facebook returned no insights for this post yet. Try again later.');
         }
 
         return $merged;
+    }
+
+    /**
+     * Reactions/comments/shares plus permalink and thumbnail, which stay
+     * available even when Insights metrics are still empty.
+     *
+     * @return array<string, mixed>
+     */
+    private function fetchPostEngagement(string $objectId, string $pageAccessToken): array
+    {
+        $fieldSets = [
+            'permalink_url,full_picture,created_time,shares,reactions.summary(true).limit(0),comments.summary(true).limit(0)',
+            'permalink_url,created_time,likes.summary(true).limit(0),comments.summary(true).limit(0),views',
+            'permalink_url,created_time',
+        ];
+
+        foreach ($fieldSets as $fields) {
+            $response = Http::get($this->graphUrl('/'.$objectId), [
+                'fields' => $fields,
+                'access_token' => $pageAccessToken,
+                'appsecret_proof' => $this->appSecretProof($pageAccessToken),
+            ]);
+
+            if (! $response->successful()) {
+                continue;
+            }
+
+            $json = $response->json() ?? [];
+
+            $collected = array_filter([
+                'reactions' => data_get($json, 'reactions.summary.total_count')
+                    ?? data_get($json, 'likes.summary.total_count'),
+                'comments' => data_get($json, 'comments.summary.total_count'),
+                'shares' => data_get($json, 'shares.count'),
+                'permalink_url' => $json['permalink_url'] ?? null,
+                'thumbnail_url' => $json['full_picture'] ?? null,
+                'video_views' => $json['views'] ?? null,
+            ], fn ($value) => $value !== null);
+
+            if ($collected !== []) {
+                return $collected;
+            }
+        }
+
+        return [];
     }
 
     /**

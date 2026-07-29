@@ -47,4 +47,39 @@ class Post extends Model
     {
         return $this->insights[$key] ?? null;
     }
+
+    /**
+     * Reads a metric by friendly name, falling back across the Graph API keys
+     * that Meta uses for photos, videos and Reels.
+     */
+    public function metric(string $name): ?float
+    {
+        foreach (self::metricKeys($name) as $key) {
+            $value = $this->insightValue($key);
+
+            if (is_numeric($value)) {
+                return (float) $value;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private static function metricKeys(string $name): array
+    {
+        return match ($name) {
+            'views' => ['post_media_view', 'post_video_views', 'video_views'],
+            'reach' => ['post_total_media_view_unique', 'post_video_views_unique'],
+            'from_followers' => ['views_from_followers'],
+            'from_non_followers' => ['views_from_non_followers'],
+            'reactions' => ['reactions'],
+            'comments' => ['comments'],
+            'shares' => ['shares'],
+            'clicks' => ['post_clicks'],
+            default => [$name],
+        };
+    }
 }
