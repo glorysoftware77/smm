@@ -267,6 +267,157 @@ class FacebookService
         return $response->json();
     }
 
+    public function publishReel(
+        string $pageId,
+        string $pageAccessToken,
+        string $filePath,
+        ?string $description = null,
+        ?string $title = null
+    ): array {
+        if (! is_readable($filePath)) {
+            throw new RuntimeException('Reel video file is not readable.');
+        }
+
+        $start = Http::asForm()->timeout(60)->post($this->graphUrl('/'.$pageId.'/video_reels'), [
+            'upload_phase' => 'start',
+            'access_token' => $pageAccessToken,
+            'appsecret_proof' => $this->appSecretProof($pageAccessToken),
+        ]);
+
+        if (! $start->successful() || ! $start->json('video_id')) {
+            throw new RuntimeException('Failed to start Facebook Reel upload: '.$start->body());
+        }
+
+        $videoId = $start->json('video_id');
+        $uploadUrl = $start->json('upload_url')
+            ?: ('https://rupload.facebook.com/video-upload/'.self::GRAPH_VERSION.'/'.$videoId);
+        $fileSize = filesize($filePath);
+
+        $upload = Http::withHeaders([
+            'Authorization' => 'OAuth '.$pageAccessToken,
+            'offset' => '0',
+            'file_size' => (string) $fileSize,
+            'Content-Type' => 'application/octet-stream',
+        ])->withBody(file_get_contents($filePath), 'application/octet-stream')
+            ->timeout(300)
+            ->post($uploadUrl);
+
+        if (! $upload->successful() || $upload->json('success') !== true) {
+            throw new RuntimeException('Failed to upload Facebook Reel binary: '.$upload->body());
+        }
+
+        $this->waitForReelUploadReady($videoId, $pageAccessToken);
+
+        $finishPayload = [
+            'upload_phase' => 'finish',
+            'video_id' => $videoId,
+            'video_state' => 'PUBLISHED',
+            'access_token' => $pageAccessToken,
+            'appsecret_proof' => $this->appSecretProof($pageAccessToken),
+        ];
+
+        if ($description !== null && $description !== '') {
+            $finishPayload['description'] = $description;
+        }
+
+        if ($title !== null && $title !== '') {
+            $finishPayload['title'] = $title;
+        }
+
+        $finish = Http::asForm()->timeout(120)->post($this->graphUrl('/'.$pageId.'/video_reels'), $finishPayload);
+
+        if (! $finish->successful()) {
+            throw new RuntimeException('Failed to publish Facebook Reel: '.$finish->body());
+        }
+
+        return array_merge($finish->json() ?? [], [
+            'id' => $finish->json('post_id') ?? $finish->json('video_id') ?? $videoId,
+            'post_id' => $finish->json('post_id') ?? null,
+            'video_id' => $videoId,
+        ]);
+    }
+
+    public function getPagePostInsights(string $objectId, string $pageAccessToken): array
+    {
+        $metrics = [
+            'post_impressions',
+            'post_impressions_unique',
+            'post_impressions_fan',
+            'post_impressions_organic',
+            'post_video_views',
+            'post_video_views_unique',
+            'post_media_view',
+        ];
+
+        $response = Http::get($this->graphUrl('/'.$objectId.'/insights'), [
+            'metric' => implode(',', $metrics),
+            'access_token' => $pageAccessToken,
+            'appsecret_proof' => $this->appSecretProof($pageAccessToken),
+        ]);
+
+        if (! $response->successful()) {
+            $videoResponse = Http::get($this->graphUrl('/'.$objectId.'/video_insights'), [
+                'metric' => 'total_video_views,total_video_impressions,total_video_view_time,total_video_views_unique',
+                'access_token' => $pageAccessToken,
+                'appsecret_proof' => $this->appSecretProof($pageAccessToken),
+            ]);
+
+            if (! $videoResponse->successful()) {
+                throw new RuntimeException('Failed to fetch insights: '.$response->body().' | '.$videoResponse->body());
+            }
+
+            return $this->normalizeInsights($videoResponse->json('data', []));
+        }
+
+        return $this->normalizeInsights($response->json('data', []));
+    }
+
+    private function waitForReelUploadReady(string $videoId, string $pageAccessToken, int $attempts = 30): void
+    {
+        for ($i = 0; $i < $attempts; $i++) {
+            $status = Http::get($this->graphUrl('/'.$videoId), [
+                'fields' => 'status',
+                'access_token' => $pageAccessToken,
+                'appsecret_proof' => $this->appSecretProof($pageAccessToken),
+            ]);
+
+            $uploading = data_get($status->json(), 'status.uploading_phase.status');
+            $error = data_get($status->json(), 'status.processing_phase.error.message')
+                ?? data_get($status->json(), 'status.uploading_phase.error.message');
+
+            if ($error) {
+                throw new RuntimeException('Facebook Reel processing error: '.$error);
+            }
+
+            if (in_array($uploading, ['complete', 'completed'], true)) {
+                return;
+            }
+
+            sleep(2);
+        }
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $rows
+     * @return array<string, int|float|string|null>
+     */
+    private function normalizeInsights(array $rows): array
+    {
+        $normalized = [];
+
+        foreach ($rows as $row) {
+            $name = $row['name'] ?? null;
+            if (! $name) {
+                continue;
+            }
+
+            $values = $row['values'] ?? [];
+            $normalized[$name] = $values[0]['value'] ?? null;
+        }
+
+        return $normalized;
+    }
+
     public function getInstagramBusinessAccount(string $pageId, string $pageAccessToken): ?array
     {
         $response = $this->graphGet('/'.$pageId, $pageAccessToken, [

@@ -11,11 +11,16 @@ class Post extends Model
         'user_id',
         'social_page_id',
         'message',
+        'title',
         'media_type',
+        'post_format',
         'media_path',
         'facebook_post_id',
+        'facebook_video_id',
         'status',
         'error_message',
+        'insights',
+        'insights_fetched_at',
         'published_at',
     ];
 
@@ -23,6 +28,8 @@ class Post extends Model
     {
         return [
             'published_at' => 'datetime',
+            'insights_fetched_at' => 'datetime',
+            'insights' => 'array',
         ];
     }
 
@@ -34,5 +41,10 @@ class Post extends Model
     public function socialPage(): BelongsTo
     {
         return $this->belongsTo(SocialPage::class);
+    }
+
+    public function insightValue(string $key): int|float|string|null
+    {
+        return $this->insights[$key] ?? null;
     }
 }

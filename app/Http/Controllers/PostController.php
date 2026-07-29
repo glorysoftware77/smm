@@ -28,7 +28,7 @@ class PostController extends Controller
             ->posts()
             ->with('socialPage')
             ->latest()
-            ->limit(10)
+            ->limit(15)
             ->get();
 
         return view('posts.create', [
@@ -41,6 +41,7 @@ class PostController extends Controller
     {
         $validated = $request->validate([
             'social_page_id' => ['required', 'exists:social_pages,id'],
+            'title' => ['nullable', 'string', 'max:255'],
             'message' => ['nullable', 'string', 'max:2200'],
             'image' => ['nullable', 'file', 'mimes:jpg,jpeg,png,gif,webp', 'max:10240'],
             'video' => ['nullable', 'file', 'mimes:mp4,mov,avi', 'max:102400'],
@@ -70,20 +71,24 @@ class PostController extends Controller
 
         $mediaType = 'none';
         $mediaPath = null;
+        $postFormat = 'standard';
 
         if ($hasImage) {
             $mediaType = 'image';
             $mediaPath = $request->file('image')->store('posts/'.$request->user()->id, 'public');
         } elseif ($hasVideo) {
             $mediaType = 'video';
+            $postFormat = 'reel';
             $mediaPath = $request->file('video')->store('posts/'.$request->user()->id, 'public');
         }
 
         $post = Post::query()->create([
             'user_id' => $request->user()->id,
             'social_page_id' => $page->id,
+            'title' => $validated['title'] ?? null,
             'message' => $validated['message'] ?? null,
             'media_type' => $mediaType,
+            'post_format' => $postFormat,
             'media_path' => $mediaPath,
             'status' => 'pending',
         ]);
@@ -108,39 +113,49 @@ class PostController extends Controller
                         $publicUrl,
                         $validated['message'] ?? null
                     );
+
+                $facebookPostId = $result['id'] ?? null;
+                $facebookVideoId = null;
             } else {
                 $absolutePath = $mediaPath
                     ? Storage::disk('public')->path($mediaPath)
                     : null;
 
-                $result = match ($mediaType) {
-                    'image' => $facebook->publishPhotoPost(
+                if ($mediaType === 'video') {
+                    $result = $facebook->publishReel(
+                        $page->page_id,
+                        $page->access_token,
+                        $absolutePath,
+                        $validated['message'] ?? null,
+                        $validated['title'] ?? null
+                    );
+                    $facebookPostId = $result['post_id'] ?? $result['id'] ?? null;
+                    $facebookVideoId = $result['video_id'] ?? null;
+                } elseif ($mediaType === 'image') {
+                    $result = $facebook->publishPhotoPost(
                         $page->page_id,
                         $page->access_token,
                         $absolutePath,
                         basename($mediaPath),
                         $validated['message'] ?? null
-                    ),
-                    'video' => $facebook->publishVideoPost(
-                        $page->page_id,
-                        $page->access_token,
-                        $absolutePath,
-                        basename($mediaPath),
-                        $validated['message'] ?? null
-                    ),
-                    default => $facebook->publishTextPost(
+                    );
+                    $facebookPostId = $result['post_id'] ?? $result['id'] ?? null;
+                    $facebookVideoId = null;
+                } else {
+                    $result = $facebook->publishTextPost(
                         $page->page_id,
                         $page->access_token,
                         (string) $validated['message']
-                    ),
-                };
+                    );
+                    $facebookPostId = $result['id'] ?? null;
+                    $facebookVideoId = null;
+                }
             }
-
-            $facebookPostId = $result['post_id'] ?? $result['id'] ?? null;
 
             $post->update([
                 'status' => 'published',
                 'facebook_post_id' => $facebookPostId,
+                'facebook_video_id' => $facebookVideoId,
                 'published_at' => now(),
                 'error_message' => null,
             ]);
@@ -157,8 +172,64 @@ class PostController extends Controller
                 ->with('error', 'Publish failed: '.$e->getMessage());
         }
 
+        $label = $postFormat === 'reel' ? 'Reel' : 'Post';
+
         return redirect()
             ->route('posts.create')
-            ->with('success', 'Published to '.$page->name.'.');
+            ->with('success', $label.' published to '.$page->name.'.');
+    }
+
+    public function refreshInsights(Request $request, Post $post, FacebookService $facebook): RedirectResponse
+    {
+        abort_unless($post->user_id === $request->user()->id, 403);
+
+        if ($post->socialPage?->provider !== 'facebook') {
+            return redirect()
+                ->route('posts.create')
+                ->with('error', 'Insights refresh is currently available for Facebook posts only.');
+        }
+
+        if ($post->status !== 'published') {
+            return redirect()
+                ->route('posts.create')
+                ->with('error', 'Only published posts can fetch insights.');
+        }
+
+        $objectId = $post->facebook_post_id ?: $post->facebook_video_id;
+
+        if (! $objectId) {
+            return redirect()
+                ->route('posts.create')
+                ->with('error', 'No Facebook post/video ID stored for this item.');
+        }
+
+        // Page post IDs are often pageId_postId.
+        if ($post->facebook_post_id && ! str_contains($post->facebook_post_id, '_')) {
+            $objectId = $post->socialPage->page_id.'_'.$post->facebook_post_id;
+        }
+
+        try {
+            $insights = $facebook->getPagePostInsights($objectId, $post->socialPage->access_token);
+
+            // If post insights empty, try video id.
+            if ($insights === [] && $post->facebook_video_id) {
+                $insights = $facebook->getPagePostInsights($post->facebook_video_id, $post->socialPage->access_token);
+            }
+
+            $post->update([
+                'insights' => $insights,
+                'insights_fetched_at' => now(),
+            ]);
+        } catch (Throwable $e) {
+            report($e);
+
+            return redirect()
+                ->route('posts.create')
+                ->with('error', 'Insights failed: '.$e->getMessage());
+        }
+
+        return redirect()
+            ->route('posts.create')
+            ->with('success', 'Insights updated for your Facebook post.');
     }
 }
