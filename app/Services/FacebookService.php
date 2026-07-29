@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -343,12 +344,149 @@ class FacebookService
     private const POST_INSIGHT_METRICS = [
         'post_media_view',
         'post_total_media_view_unique',
+        'post_impressions_unique',
+        'post_impressions_organic_unique',
         'post_video_views',
         'post_video_views_unique',
         'post_video_avg_time_watched',
         'post_video_view_time',
         'post_clicks',
     ];
+
+    /**
+     * Every published item on the Page for a date window, regardless of which
+     * tool published it, with insights and engagement counts attached.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function getPageContent(string $pageId, string $pageAccessToken, int $since, int $until, int $maxItems = 100): array
+    {
+        $items = $this->fetchPageFeed($pageId, $pageAccessToken, $since, $until, $maxItems);
+        $metrics = $this->supportedPostMetrics($pageId, $pageAccessToken, $items);
+        $content = [];
+
+        foreach ($items as $item) {
+            $objectId = $item['id'] ?? null;
+
+            if (! $objectId) {
+                continue;
+            }
+
+            $insights = [];
+
+            if ($metrics !== []) {
+                $response = $this->insightsRequest($objectId, $pageAccessToken, [
+                    'metric' => implode(',', $metrics),
+                ]);
+
+                if ($response->successful()) {
+                    $insights = $this->normalizeInsights($response->json('data', []));
+                }
+            }
+
+            $insights = array_merge($insights, $this->fetchFollowerBreakdown($objectId, $pageAccessToken));
+
+            $attachment = data_get($item, 'attachments.data.0', []);
+            $mediaType = strtolower((string) ($attachment['media_type'] ?? $attachment['type'] ?? ''));
+
+            $content[] = [
+                'id' => $objectId,
+                'created_time' => $item['created_time'] ?? null,
+                'message' => $item['message'] ?? $item['story'] ?? data_get($attachment, 'title'),
+                'permalink_url' => $item['permalink_url'] ?? null,
+                'thumbnail_url' => $item['full_picture'] ?? data_get($attachment, 'media.image.src'),
+                'type' => $mediaType ?: 'status',
+                'reactions' => (int) (data_get($item, 'reactions.summary.total_count') ?? 0),
+                'comments' => (int) (data_get($item, 'comments.summary.total_count') ?? 0),
+                'shares' => (int) (data_get($item, 'shares.count') ?? 0),
+                'insights' => $insights,
+            ];
+        }
+
+        return $content;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function fetchPageFeed(string $pageId, string $pageAccessToken, int $since, int $until, int $maxItems): array
+    {
+        $fields = 'id,created_time,message,story,permalink_url,full_picture,shares,'
+            .'attachments{media_type,type,title,media},'
+            .'reactions.summary(true).limit(0),comments.summary(true).limit(0)';
+
+        foreach (['/published_posts', '/posts', '/feed'] as $edge) {
+            $response = Http::get($this->graphUrl('/'.$pageId.$edge), [
+                'fields' => $fields,
+                'since' => $since,
+                'until' => $until,
+                'limit' => 50,
+                'access_token' => $pageAccessToken,
+                'appsecret_proof' => $this->appSecretProof($pageAccessToken),
+            ]);
+
+            if (! $response->successful()) {
+                Log::info('Facebook page feed edge unavailable', [
+                    'edge' => $edge,
+                    'body' => $response->body(),
+                ]);
+
+                continue;
+            }
+
+            $items = $response->json('data', []);
+            $next = $response->json('paging.next');
+
+            while ($next && count($items) < $maxItems) {
+                $page = Http::get($next);
+
+                if (! $page->successful()) {
+                    break;
+                }
+
+                $items = array_merge($items, $page->json('data', []));
+                $next = $page->json('paging.next');
+            }
+
+            if ($items !== []) {
+                return array_slice($items, 0, $maxItems);
+            }
+        }
+
+        return [];
+    }
+
+    /**
+     * Meta rejects the whole request when one metric is invalid, so probe the
+     * candidates once against a real post and remember what the API accepts.
+     *
+     * @param  array<int, array<string, mixed>>  $items
+     * @return array<int, string>
+     */
+    private function supportedPostMetrics(string $pageId, string $pageAccessToken, array $items): array
+    {
+        $probeId = data_get($items, '0.id');
+
+        if (! $probeId) {
+            return [];
+        }
+
+        return Cache::remember(
+            'facebook:post-metrics:'.self::GRAPH_VERSION.':'.$pageId,
+            now()->addHours(12),
+            function () use ($probeId, $pageAccessToken) {
+                $supported = [];
+
+                foreach (self::POST_INSIGHT_METRICS as $metric) {
+                    if ($this->insightsRequest($probeId, $pageAccessToken, ['metric' => $metric])->successful()) {
+                        $supported[] = $metric;
+                    }
+                }
+
+                return $supported;
+            }
+        );
+    }
 
     public function getPagePostInsights(string $objectId, string $pageAccessToken): array
     {

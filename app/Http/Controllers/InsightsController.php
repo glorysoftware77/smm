@@ -3,24 +3,25 @@
 namespace App\Http\Controllers;
 
 use App\Models\Post;
+use App\Models\SocialPage;
 use App\Services\FacebookService;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Throwable;
 
 class InsightsController extends Controller
 {
-    /**
-     * Stop auto-fetching once a page load has spent this long on Graph calls.
-     */
-    private const AUTO_FETCH_BUDGET_SECONDS = 12;
-
-    /** @var array<int, string> */
+    /** @var array<int, int> */
     private const RANGES = [7, 28, 90];
 
     private const DEFAULT_RANGE = 28;
+
+    private const CACHE_MINUTES = 10;
 
     public function index(Request $request, FacebookService $facebook): View
     {
@@ -28,73 +29,235 @@ class InsightsController extends Controller
         $range = $this->range($request->integer('range', self::DEFAULT_RANGE));
         [$from, $to] = $this->rangeBounds($range);
 
-        $posts = $this->publishedPosts($request, $platform, $from, $to, 100);
+        $page = $this->connectedPage($request, $platform);
+        $error = null;
+        $rows = collect();
 
-        if ($platform === 'facebook') {
-            $this->autoFetchMissingInsights($posts, $facebook);
+        if ($platform === 'facebook' && $page) {
+            try {
+                $rows = $this->facebookRows($page, $from, $to, $request->boolean('fresh'));
+            } catch (Throwable $e) {
+                report($e);
+                $error = $e->getMessage();
+            }
+        } else {
+            $rows = $this->localRows($request, $platform, $from, $to);
         }
 
         return view('insights.index', [
             'platform' => $platform,
             'range' => $range,
+            'ranges' => self::RANGES,
             'rangeFrom' => $from,
             'rangeTo' => $to,
-            'ranges' => self::RANGES,
-            'posts' => $posts,
-            'summary' => $this->buildSummary($posts),
-            'page' => $this->pageSummary($request, $platform, $facebook, $from, $to),
+            'pageName' => $page?->name,
+            'pageStats' => $platform === 'facebook' && $page ? $this->pageStats($page, $facebook, $from, $to) : null,
+            'rows' => $rows,
+            'summary' => $this->buildSummary($rows),
+            'error' => $error,
         ]);
     }
 
-    public function refreshAll(Request $request, FacebookService $facebook): RedirectResponse
+    public function refreshAll(Request $request): RedirectResponse
     {
         $platform = $this->platform($request->string('platform')->toString());
         $range = $this->range($request->integer('range', self::DEFAULT_RANGE));
 
-        if ($platform !== 'facebook') {
-            return $this->back($platform, $range, 'error', 'Bulk refresh is available for Facebook only right now.');
+        $page = $this->connectedPage($request, $platform);
+
+        if ($page) {
+            Cache::forget($this->cacheKey($page, ...$this->rangeBounds($range)));
         }
 
-        [$from, $to] = $this->rangeBounds($range);
-        $posts = $this->publishedPosts($request, 'facebook', $from, $to, 50);
-
-        $updated = 0;
-        $failed = 0;
-
-        foreach ($posts as $post) {
-            try {
-                $this->refreshPostInsights($post, $facebook) ? $updated++ : $failed++;
-            } catch (Throwable $e) {
-                report($e);
-                $failed++;
-            }
-        }
-
-        return $this->back('facebook', $range, 'success', "Refreshed {$updated} post(s)".($failed ? ", {$failed} not ready yet." : '.'));
+        return redirect()->route('insights.index', [
+            'platform' => $platform,
+            'range' => $range,
+            'fresh' => 1,
+        ]);
     }
 
-    public function refreshPost(Request $request, Post $post, FacebookService $facebook): RedirectResponse
+    public function refreshPost(Request $request, Post $post): RedirectResponse
     {
         abort_unless($post->user_id === $request->user()->id, 403);
 
-        $platform = $post->socialPage?->provider ?? 'facebook';
-        $range = $this->range($request->integer('range', self::DEFAULT_RANGE));
+        return $this->refreshAll($request);
+    }
 
-        if ($platform !== 'facebook') {
-            return $this->back($platform, $range, 'error', 'Insights refresh is currently available for Facebook posts only.');
+    /**
+     * Live Page content from Meta, which includes posts made outside this app.
+     */
+    private function facebookRows(SocialPage $page, Carbon $from, Carbon $to, bool $fresh): Collection
+    {
+        $key = $this->cacheKey($page, $from, $to);
+
+        if ($fresh) {
+            Cache::forget($key);
         }
+
+        $content = Cache::remember($key, now()->addMinutes(self::CACHE_MINUTES), function () use ($page, $from, $to) {
+            return app(FacebookService::class)->getPageContent(
+                $page->page_id,
+                $page->access_token,
+                $from->timestamp,
+                $to->timestamp,
+            );
+        });
+
+        $appPostIds = Post::query()
+            ->where('social_page_id', $page->id)
+            ->pluck('facebook_post_id')
+            ->filter()
+            ->map(fn ($id) => Str::afterLast($id, '_'))
+            ->all();
+
+        return collect($content)
+            ->map(function (array $item) use ($appPostIds) {
+                $insights = $item['insights'] ?? [];
+
+                return [
+                    'title' => $this->rowTitle($item['message'] ?? null),
+                    'type' => $item['type'] ?? 'status',
+                    'permalink' => $item['permalink_url'] ?? null,
+                    'thumbnail' => $item['thumbnail_url'] ?? null,
+                    'published_at' => $item['created_time'] ? Carbon::parse($item['created_time']) : null,
+                    'views' => $this->pick($insights, ['post_media_view', 'post_video_views']),
+                    'reach' => $this->pick($insights, [
+                        'post_impressions_unique',
+                        'post_impressions_organic_unique',
+                        'post_total_media_view_unique',
+                        'post_video_views_unique',
+                    ]),
+                    'from_followers' => $this->pick($insights, ['views_from_followers']),
+                    'from_non_followers' => $this->pick($insights, ['views_from_non_followers']),
+                    'reactions' => $item['reactions'] ?? 0,
+                    'comments' => $item['comments'] ?? 0,
+                    'shares' => $item['shares'] ?? 0,
+                    'from_app' => in_array(Str::afterLast((string) $item['id'], '_'), $appPostIds, true),
+                ];
+            })
+            ->sortByDesc(fn (array $row) => $row['published_at']?->timestamp ?? 0)
+            ->values();
+    }
+
+    /**
+     * Fallback for platforms without a content API wired up yet.
+     */
+    private function localRows(Request $request, string $platform, Carbon $from, Carbon $to): Collection
+    {
+        return $request->user()
+            ->posts()
+            ->with('socialPage')
+            ->where('status', 'published')
+            ->whereHas('socialPage', fn ($query) => $query->where('provider', $platform))
+            ->whereBetween('created_at', [$from, $to])
+            ->latest()
+            ->limit(100)
+            ->get()
+            ->map(fn (Post $post) => [
+                'title' => $this->rowTitle($post->title ?: $post->message),
+                'type' => $post->post_format === 'reel' ? 'reel' : ($post->media_type ?: 'status'),
+                'permalink' => $post->insightValue('permalink_url'),
+                'thumbnail' => $post->insightValue('thumbnail_url'),
+                'published_at' => $post->published_at ?? $post->created_at,
+                'views' => $post->metric('views'),
+                'reach' => $post->metric('reach'),
+                'from_followers' => $post->metric('from_followers'),
+                'from_non_followers' => $post->metric('from_non_followers'),
+                'reactions' => $post->metric('reactions') ?? 0,
+                'comments' => $post->metric('comments') ?? 0,
+                'shares' => $post->metric('shares') ?? 0,
+                'from_app' => true,
+            ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function pageStats(SocialPage $page, FacebookService $facebook, Carbon $from, Carbon $to): array
+    {
+        $stats = ['followers' => null, 'new_follows' => null, 'page_views' => null];
 
         try {
-            $ok = $this->refreshPostInsights($post, $facebook);
+            $insights = $facebook->getPageSummaryInsights(
+                $page->page_id,
+                $page->access_token,
+                $from->timestamp,
+                $to->timestamp,
+            );
 
-            return $this->back('facebook', $range, $ok ? 'success' : 'error', $ok
-                ? 'Insights updated.'
-                : 'Insights not available yet for this post.');
+            $stats['followers'] = $insights['followers_count'] ?? null;
+            $stats['new_follows'] = $insights['page_daily_follows_unique']
+                ?? $insights['page_daily_follows']
+                ?? $insights['page_follows']
+                ?? null;
+            $stats['page_views'] = $insights['page_views_total'] ?? $insights['page_media_view'] ?? null;
         } catch (Throwable $e) {
             report($e);
-
-            return $this->back('facebook', $range, 'error', 'Insights failed: '.$e->getMessage());
         }
+
+        return $stats;
+    }
+
+    /**
+     * @param  Collection<int, array<string, mixed>>  $rows
+     * @return array<string, int>
+     */
+    private function buildSummary(Collection $rows): array
+    {
+        $sum = fn (string $key) => (int) $rows->sum(fn (array $row) => (float) ($row[$key] ?? 0));
+
+        return [
+            'views' => $sum('views'),
+            'reach' => $sum('reach'),
+            'from_followers' => $sum('from_followers'),
+            'from_non_followers' => $sum('from_non_followers'),
+            'reactions' => $sum('reactions'),
+            'comments' => $sum('comments'),
+            'shares' => $sum('shares'),
+            'total' => $rows->count(),
+            'from_app' => $rows->where('from_app', true)->count(),
+        ];
+    }
+
+    private function connectedPage(Request $request, string $platform): ?SocialPage
+    {
+        return $request->user()
+            ->socialPages()
+            ->where('provider', $platform)
+            ->where('is_connected', true)
+            ->orderBy('name')
+            ->first();
+    }
+
+    private function cacheKey(SocialPage $page, Carbon $from, Carbon $to): string
+    {
+        return sprintf('insights:fb:%d:%s:%s', $page->id, $from->toDateString(), $to->toDateString());
+    }
+
+    /**
+     * @param  array<string, mixed>  $insights
+     * @param  array<int, string>  $keys
+     */
+    private function pick(array $insights, array $keys): ?float
+    {
+        $best = null;
+
+        foreach ($keys as $key) {
+            $value = $insights[$key] ?? null;
+
+            if (is_numeric($value)) {
+                $best = max($best ?? 0, (float) $value);
+            }
+        }
+
+        return $best;
+    }
+
+    private function rowTitle(?string $message): string
+    {
+        $line = trim(Str::before(trim((string) $message), "\n"));
+
+        return $line !== '' ? Str::limit($line, 70) : 'Untitled';
     }
 
     private function platform(?string $value): string
@@ -112,185 +275,6 @@ class InsightsController extends Controller
      */
     private function rangeBounds(int $days): array
     {
-        $to = now()->endOfDay();
-        $from = now()->subDays($days - 1)->startOfDay();
-
-        return [$from, $to];
-    }
-
-    private function back(string $platform, int $range, string $key, string $message): RedirectResponse
-    {
-        return redirect()
-            ->route('insights.index', ['platform' => $platform, 'range' => $range])
-            ->with($key, $message);
-    }
-
-    /**
-     * @return \Illuminate\Database\Eloquent\Collection<int, Post>
-     */
-    private function publishedPosts(Request $request, string $platform, Carbon $from, Carbon $to, int $limit)
-    {
-        return $request->user()
-            ->posts()
-            ->with('socialPage')
-            ->where('status', 'published')
-            ->whereHas('socialPage', fn ($query) => $query->where('provider', $platform))
-            ->where(function ($query) use ($from, $to) {
-                $query->whereBetween('published_at', [$from, $to])
-                    ->orWhere(function ($inner) use ($from, $to) {
-                        $inner->whereNull('published_at')
-                            ->whereBetween('created_at', [$from, $to]);
-                    });
-            })
-            ->latest('published_at')
-            ->latest('created_at')
-            ->limit($limit)
-            ->get();
-    }
-
-    /**
-     * @param  \Illuminate\Support\Collection<int, Post>  $posts
-     */
-    private function autoFetchMissingInsights($posts, FacebookService $facebook): void
-    {
-        $startedAt = microtime(true);
-
-        foreach ($posts as $post) {
-            if ($post->insights_fetched_at !== null) {
-                continue;
-            }
-
-            if (microtime(true) - $startedAt > self::AUTO_FETCH_BUDGET_SECONDS) {
-                return;
-            }
-
-            try {
-                $this->refreshPostInsights($post, $facebook);
-            } catch (Throwable) {
-                continue;
-            }
-        }
-    }
-
-    /**
-     * @param  \Illuminate\Support\Collection<int, Post>  $posts
-     * @return array<string, int>
-     */
-    private function buildSummary($posts): array
-    {
-        $summary = [
-            'views' => 0,
-            'reach' => 0,
-            'from_followers' => 0,
-            'from_non_followers' => 0,
-            'reactions' => 0,
-            'comments' => 0,
-            'shares' => 0,
-            'clicks' => 0,
-            'with_insights' => 0,
-            'total' => $posts->count(),
-        ];
-
-        foreach ($posts as $post) {
-            if ($post->metric('views') !== null || $post->metric('reactions') !== null) {
-                $summary['with_insights']++;
-            }
-
-            foreach (['views', 'reach', 'from_followers', 'from_non_followers', 'reactions', 'comments', 'shares', 'clicks'] as $key) {
-                $summary[$key] += (int) ($post->metric($key) ?? 0);
-            }
-        }
-
-        return $summary;
-    }
-
-    /**
-     * @return array<string, mixed>|null
-     */
-    private function pageSummary(Request $request, string $platform, FacebookService $facebook, Carbon $from, Carbon $to): ?array
-    {
-        if ($platform !== 'facebook') {
-            return null;
-        }
-
-        $page = $request->user()
-            ->socialPages()
-            ->where('provider', 'facebook')
-            ->where('is_connected', true)
-            ->orderBy('name')
-            ->first();
-
-        if (! $page) {
-            return null;
-        }
-
-        $data = ['name' => $page->name, 'followers' => null, 'new_follows' => null, 'page_views' => null];
-
-        try {
-            $insights = $facebook->getPageSummaryInsights(
-                $page->page_id,
-                $page->access_token,
-                $from->timestamp,
-                $to->timestamp,
-            );
-
-            $data['followers'] = $insights['followers_count'] ?? null;
-            $data['new_follows'] = $insights['page_daily_follows_unique']
-                ?? $insights['page_daily_follows']
-                ?? $insights['page_follows']
-                ?? null;
-            $data['page_views'] = $insights['page_views_total'] ?? $insights['page_media_view'] ?? null;
-        } catch (Throwable $e) {
-            report($e);
-        }
-
-        return $data;
-    }
-
-    private function refreshPostInsights(Post $post, FacebookService $facebook): bool
-    {
-        if ($post->status !== 'published' || $post->socialPage?->provider !== 'facebook') {
-            return false;
-        }
-
-        foreach ($this->objectIdCandidates($post) as $objectId) {
-            try {
-                $insights = $facebook->getPagePostInsights($objectId, $post->socialPage->access_token);
-            } catch (Throwable) {
-                continue;
-            }
-
-            if ($insights !== []) {
-                $post->update([
-                    'insights' => $insights,
-                    'insights_fetched_at' => now(),
-                ]);
-
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    private function objectIdCandidates(Post $post): array
-    {
-        $candidates = [];
-
-        if ($post->facebook_post_id) {
-            $candidates[] = str_contains($post->facebook_post_id, '_')
-                ? $post->facebook_post_id
-                : $post->socialPage->page_id.'_'.$post->facebook_post_id;
-        }
-
-        if ($post->facebook_video_id) {
-            $candidates[] = $post->socialPage->page_id.'_'.$post->facebook_video_id;
-            $candidates[] = $post->facebook_video_id;
-        }
-
-        return array_values(array_unique($candidates));
+        return [now()->subDays($days - 1)->startOfDay(), now()->endOfDay()];
     }
 }

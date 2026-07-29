@@ -8,16 +8,17 @@
         <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
                 <h2 class="font-semibold text-xl text-gray-800 leading-tight">{{ __('Insights') }}</h2>
-                @if ($page)
-                    <p class="text-sm text-gray-500">{{ $page['name'] }}</p>
-                @endif
+                <p class="text-sm text-gray-500">
+                    {{ $pageName ?? 'No account connected' }}
+                    <span class="text-gray-400">· {{ $rangeFrom->format('j M Y') }} – {{ $rangeTo->format('j M Y') }}</span>
+                </p>
             </div>
 
             <div class="flex items-center gap-2">
                 <div class="inline-flex rounded-md border border-gray-300 bg-white p-0.5">
                     @foreach ($tabs as $key => $label)
                         <a href="{{ route('insights.index', ['platform' => $key, 'range' => $range]) }}"
-                           class="px-3 py-1.5 text-sm rounded {{ $platform === $key ? 'bg-gray-900 text-white' : 'text-gray-600 hover:text-gray-900' }}">
+                           class="rounded px-3 py-1.5 text-sm {{ $platform === $key ? 'bg-gray-900 text-white' : 'text-gray-600 hover:text-gray-900' }}">
                             {{ $label }}
                         </a>
                     @endforeach
@@ -33,32 +34,18 @@
                     @endforeach
                 </select>
 
-                @if ($platform === 'facebook')
-                    <form method="POST" action="{{ route('insights.refresh') }}">
-                        @csrf
-                        <input type="hidden" name="platform" value="facebook">
-                        <input type="hidden" name="range" value="{{ $range }}">
-                        <button type="submit"
-                                class="rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">
-                            Refresh all
-                        </button>
-                    </form>
-                @endif
+                <a href="{{ route('insights.index', ['platform' => $platform, 'range' => $range, 'fresh' => 1]) }}"
+                   class="rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+                    Refresh
+                </a>
             </div>
         </div>
-        <p class="mt-2 text-sm text-gray-500">
-            {{ $rangeFrom->format('j M Y') }} – {{ $rangeTo->format('j M Y') }}
-        </p>
     </x-slot>
 
     <div class="py-6">
         <div class="mx-auto max-w-7xl space-y-5 px-4 sm:px-6 lg:px-8">
-            @if (session('success'))
-                <div class="rounded-md bg-green-50 px-4 py-3 text-sm text-green-800">{{ session('success') }}</div>
-            @endif
-
-            @if (session('error'))
-                <div class="rounded-md bg-red-50 px-4 py-3 text-sm text-red-800">{{ session('error') }}</div>
+            @if ($error)
+                <div class="rounded-md bg-red-50 px-4 py-3 text-sm text-red-800">{{ $error }}</div>
             @endif
 
             <div class="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
@@ -78,25 +65,26 @@
                 @endforeach
             </div>
 
-            @if ($page)
+            @if ($pageStats)
                 <div class="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm">
                     <span class="text-gray-500">Page followers:
-                        <strong class="text-gray-900">{{ $fmt($page['followers']) }}</strong>
+                        <strong class="text-gray-900">{{ $fmt($pageStats['followers']) }}</strong>
                     </span>
                     <span class="text-gray-500">New follows ({{ $range }}d):
-                        <strong class="text-gray-900">{{ $fmt($page['new_follows']) }}</strong>
+                        <strong class="text-gray-900">{{ $fmt($pageStats['new_follows']) }}</strong>
                     </span>
                     <span class="text-gray-500">Page views ({{ $range }}d):
-                        <strong class="text-gray-900">{{ $fmt($page['page_views']) }}</strong>
+                        <strong class="text-gray-900">{{ $fmt($pageStats['page_views']) }}</strong>
                     </span>
-                    <span class="text-gray-400">{{ $summary['with_insights'] }}/{{ $summary['total'] }} posts in range</span>
+                    <span class="text-gray-400">
+                        {{ $summary['total'] }} posts · {{ $summary['from_app'] }} published from this app
+                    </span>
                 </div>
             @endif
 
-            @if ($posts->isEmpty())
+            @if ($rows->isEmpty())
                 <div class="rounded-lg border border-gray-200 bg-white p-10 text-center text-sm text-gray-500">
-                    No published {{ $tabs[$platform] }} posts yet.
-                    <a href="{{ route('posts.create') }}" class="ml-1 text-indigo-600 underline">Create a post</a>
+                    No {{ $tabs[$platform] }} content in this range.
                 </div>
             @else
                 <div class="hidden overflow-hidden rounded-lg border border-gray-200 bg-white lg:block">
@@ -112,57 +100,46 @@
                                 <th class="px-3 py-2.5 text-right font-medium">Comments</th>
                                 <th class="px-3 py-2.5 text-right font-medium">Shares</th>
                                 <th class="px-3 py-2.5 text-right font-medium">Published</th>
-                                <th class="px-3 py-2.5"></th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100">
-                            @foreach ($posts as $post)
-                                @php
-                                    $thumb = $post->insightValue('thumbnail_url')
-                                        ?: ($post->media_type === 'image' && $post->media_path ? asset('storage/'.$post->media_path) : null);
-                                    $permalink = $post->insightValue('permalink_url');
-                                @endphp
+                            @foreach ($rows as $row)
                                 <tr class="hover:bg-gray-50">
                                     <td class="max-w-md px-4 py-3">
                                         <div class="flex items-start gap-3">
                                             <div class="h-11 w-11 shrink-0 overflow-hidden rounded bg-gray-100">
-                                                @if ($thumb)
-                                                    <img src="{{ $thumb }}" alt="" class="h-11 w-11 object-cover">
+                                                @if ($row['thumbnail'])
+                                                    <img src="{{ $row['thumbnail'] }}" alt="" class="h-11 w-11 object-cover">
                                                 @else
                                                     <div class="flex h-11 w-11 items-center justify-center text-[10px] uppercase text-gray-400">
-                                                        {{ $post->post_format === 'reel' ? 'Reel' : $post->media_type }}
+                                                        {{ Str::limit($row['type'], 5, '') }}
                                                     </div>
                                                 @endif
                                             </div>
                                             <div class="min-w-0">
-                                                <div class="truncate font-medium text-gray-900">
-                                                    {{ $post->title ?: \Illuminate\Support\Str::limit($post->message ?: 'Untitled', 60) }}
-                                                </div>
+                                                <div class="truncate font-medium text-gray-900">{{ $row['title'] }}</div>
                                                 <div class="mt-0.5 flex items-center gap-2 text-xs text-gray-500">
-                                                    <span class="uppercase">{{ $post->post_format === 'reel' ? 'Reel' : ($post->media_type ?: 'text') }}</span>
-                                                    @if ($permalink)
-                                                        <a href="{{ $permalink }}" target="_blank" rel="noopener" class="text-indigo-600 hover:underline">View</a>
+                                                    <span class="uppercase">{{ $row['type'] }}</span>
+                                                    @if ($row['permalink'])
+                                                        <a href="{{ $row['permalink'] }}" target="_blank" rel="noopener"
+                                                           class="text-indigo-600 hover:underline">View</a>
+                                                    @endif
+                                                    @if ($row['from_app'])
+                                                        <span class="rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700">SMM</span>
                                                     @endif
                                                 </div>
                                             </div>
                                         </div>
                                     </td>
-                                    <td class="px-3 py-3 text-right font-semibold text-gray-900">{{ $fmt($post->metric('views')) }}</td>
-                                    <td class="px-3 py-3 text-right text-gray-700">{{ $fmt($post->metric('reach')) }}</td>
-                                    <td class="px-3 py-3 text-right text-gray-700">{{ $fmt($post->metric('from_followers')) }}</td>
-                                    <td class="px-3 py-3 text-right text-gray-700">{{ $fmt($post->metric('from_non_followers')) }}</td>
-                                    <td class="px-3 py-3 text-right text-gray-700">{{ $fmt($post->metric('reactions')) }}</td>
-                                    <td class="px-3 py-3 text-right text-gray-700">{{ $fmt($post->metric('comments')) }}</td>
-                                    <td class="px-3 py-3 text-right text-gray-700">{{ $fmt($post->metric('shares')) }}</td>
+                                    <td class="px-3 py-3 text-right font-semibold text-gray-900">{{ $fmt($row['views']) }}</td>
+                                    <td class="px-3 py-3 text-right text-gray-700">{{ $fmt($row['reach']) }}</td>
+                                    <td class="px-3 py-3 text-right text-gray-700">{{ $fmt($row['from_followers']) }}</td>
+                                    <td class="px-3 py-3 text-right text-gray-700">{{ $fmt($row['from_non_followers']) }}</td>
+                                    <td class="px-3 py-3 text-right text-gray-700">{{ $fmt($row['reactions']) }}</td>
+                                    <td class="px-3 py-3 text-right text-gray-700">{{ $fmt($row['comments']) }}</td>
+                                    <td class="px-3 py-3 text-right text-gray-700">{{ $fmt($row['shares']) }}</td>
                                     <td class="px-3 py-3 text-right text-xs text-gray-500">
-                                        {{ ($post->published_at ?? $post->created_at)?->format('d M H:i') }}
-                                    </td>
-                                    <td class="px-3 py-3 text-right">
-                                        <form method="POST" action="{{ route('insights.posts.refresh', $post) }}">
-                                            @csrf
-                                            <input type="hidden" name="range" value="{{ $range }}">
-                                            <button type="submit" class="text-xs text-indigo-600 hover:text-indigo-800">Refresh</button>
-                                        </form>
+                                        {{ $row['published_at']?->format('d M H:i') }}
                                     </td>
                                 </tr>
                             @endforeach
@@ -171,19 +148,15 @@
                 </div>
 
                 <div class="space-y-3 lg:hidden">
-                    @foreach ($posts as $post)
+                    @foreach ($rows as $row)
                         <div class="rounded-lg border border-gray-200 bg-white p-4">
                             <div class="flex items-start justify-between gap-3">
                                 <div class="min-w-0">
-                                    <div class="truncate text-sm font-medium text-gray-900">
-                                        {{ $post->title ?: \Illuminate\Support\Str::limit($post->message ?: 'Untitled', 60) }}
-                                    </div>
-                                    <div class="mt-0.5 text-xs uppercase text-gray-500">
-                                        {{ $post->post_format === 'reel' ? 'Reel' : ($post->media_type ?: 'text') }}
-                                    </div>
+                                    <div class="truncate text-sm font-medium text-gray-900">{{ $row['title'] }}</div>
+                                    <div class="mt-0.5 text-xs uppercase text-gray-500">{{ $row['type'] }}</div>
                                 </div>
                                 <span class="whitespace-nowrap text-xs text-gray-400">
-                                    {{ ($post->published_at ?? $post->created_at)?->format('d M') }}
+                                    {{ $row['published_at']?->format('d M') }}
                                 </span>
                             </div>
 
@@ -191,23 +164,17 @@
                                 @foreach (['Views' => 'views', 'Reach' => 'reach', 'React.' => 'reactions', 'Shares' => 'shares'] as $label => $key)
                                     <div class="rounded bg-gray-50 py-2">
                                         <div class="text-gray-500">{{ $label }}</div>
-                                        <div class="font-semibold text-gray-900">{{ $fmt($post->metric($key)) }}</div>
+                                        <div class="font-semibold text-gray-900">{{ $fmt($row[$key]) }}</div>
                                     </div>
                                 @endforeach
                             </div>
-
-                            <form method="POST" action="{{ route('insights.posts.refresh', $post) }}" class="mt-3 text-right">
-                                @csrf
-                                <input type="hidden" name="range" value="{{ $range }}">
-                                <button type="submit" class="text-xs text-indigo-600">Refresh</button>
-                            </form>
                         </div>
                     @endforeach
                 </div>
             @endif
 
             <p class="text-xs text-gray-400">
-                Showing posts published in the selected range. Per-post views are lifetime for that post; page follows/views are summed for the range.
+                Pulled live from your Facebook Page, so posts made outside this app are included. Cached for 10 minutes; hit Refresh for the latest.
             </p>
         </div>
     </div>
