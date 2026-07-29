@@ -337,39 +337,124 @@ class FacebookService
         ]);
     }
 
+    /**
+     * Metrics valid after Meta's Nov 2025 Page Insights deprecations.
+     */
+    private const POST_INSIGHT_METRICS = [
+        'post_media_view',
+        'post_total_media_view_unique',
+        'post_video_views',
+        'post_video_views_unique',
+        'post_video_avg_time_watched',
+        'post_video_view_time',
+        'post_clicks',
+    ];
+
     public function getPagePostInsights(string $objectId, string $pageAccessToken): array
     {
-        $metrics = [
-            'post_impressions',
-            'post_impressions_unique',
-            'post_impressions_fan',
-            'post_impressions_organic',
-            'post_video_views',
-            'post_video_views_unique',
-            'post_media_view',
-        ];
+        $insights = $this->fetchInsightMetrics($objectId, $pageAccessToken, self::POST_INSIGHT_METRICS);
+        $followerSplit = $this->fetchFollowerBreakdown($objectId, $pageAccessToken);
 
-        $response = Http::get($this->graphUrl('/'.$objectId.'/insights'), [
+        $merged = array_merge($insights, $followerSplit);
+
+        if ($merged === []) {
+            throw new RuntimeException('Facebook returned no insights for this post yet. Try again later.');
+        }
+
+        return $merged;
+    }
+
+    /**
+     * Requests metrics together, then one-by-one so a single invalid metric
+     * does not fail the whole request.
+     *
+     * @param  array<int, string>  $metrics
+     * @return array<string, mixed>
+     */
+    private function fetchInsightMetrics(string $objectId, string $pageAccessToken, array $metrics): array
+    {
+        $batch = $this->insightsRequest($objectId, $pageAccessToken, [
             'metric' => implode(',', $metrics),
-            'access_token' => $pageAccessToken,
-            'appsecret_proof' => $this->appSecretProof($pageAccessToken),
+        ]);
+
+        if ($batch->successful()) {
+            return $this->normalizeInsights($batch->json('data', []));
+        }
+
+        $collected = [];
+
+        foreach ($metrics as $metric) {
+            $response = $this->insightsRequest($objectId, $pageAccessToken, [
+                'metric' => $metric,
+            ]);
+
+            if (! $response->successful()) {
+                Log::info('Skipping unsupported Facebook insight metric', [
+                    'metric' => $metric,
+                    'object_id' => $objectId,
+                ]);
+
+                continue;
+            }
+
+            $collected = array_merge($collected, $this->normalizeInsights($response->json('data', [])));
+        }
+
+        return $collected;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function fetchFollowerBreakdown(string $objectId, string $pageAccessToken): array
+    {
+        $response = $this->insightsRequest($objectId, $pageAccessToken, [
+            'metric' => 'post_media_view',
+            'breakdown' => 'is_from_followers',
         ]);
 
         if (! $response->successful()) {
-            $videoResponse = Http::get($this->graphUrl('/'.$objectId.'/video_insights'), [
-                'metric' => 'total_video_views,total_video_impressions,total_video_view_time,total_video_views_unique',
-                'access_token' => $pageAccessToken,
-                'appsecret_proof' => $this->appSecretProof($pageAccessToken),
-            ]);
-
-            if (! $videoResponse->successful()) {
-                throw new RuntimeException('Failed to fetch insights: '.$response->body().' | '.$videoResponse->body());
-            }
-
-            return $this->normalizeInsights($videoResponse->json('data', []));
+            return [];
         }
 
-        return $this->normalizeInsights($response->json('data', []));
+        $result = [];
+
+        foreach ($response->json('data', []) as $row) {
+            foreach ($row['values'] ?? [] as $entry) {
+                $value = $entry['value'] ?? null;
+
+                if (! is_array($value)) {
+                    continue;
+                }
+
+                foreach ($value as $item) {
+                    if (! is_array($item)) {
+                        continue;
+                    }
+
+                    $dimension = strtolower((string) (data_get($item, 'dimension_values.0') ?? ''));
+                    $count = $item['value'] ?? null;
+
+                    if ($count === null || $dimension === '') {
+                        continue;
+                    }
+
+                    $isFollower = in_array($dimension, ['true', '1', 'follower', 'followers'], true);
+                    $key = $isFollower ? 'views_from_followers' : 'views_from_non_followers';
+                    $result[$key] = ($result[$key] ?? 0) + (int) $count;
+                }
+            }
+        }
+
+        return $result;
+    }
+
+    private function insightsRequest(string $objectId, string $pageAccessToken, array $query): \Illuminate\Http\Client\Response
+    {
+        return Http::get($this->graphUrl('/'.$objectId.'/insights'), array_merge($query, [
+            'access_token' => $pageAccessToken,
+            'appsecret_proof' => $this->appSecretProof($pageAccessToken),
+        ]));
     }
 
     private function waitForReelUploadReady(string $videoId, string $pageAccessToken, int $attempts = 30): void
@@ -411,8 +496,13 @@ class FacebookService
                 continue;
             }
 
-            $values = $row['values'] ?? [];
-            $normalized[$name] = $values[0]['value'] ?? null;
+            $value = data_get($row, 'values.0.value');
+
+            if (is_array($value) || $value === null) {
+                continue;
+            }
+
+            $normalized[$name] = $value;
         }
 
         return $normalized;

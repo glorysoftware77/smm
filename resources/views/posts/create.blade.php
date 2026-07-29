@@ -130,18 +130,16 @@
                                             @if (!empty($post->insights))
                                                 <div class="mt-2 flex flex-wrap gap-3 text-xs text-gray-600">
                                                     @foreach ([
-                                                        'post_impressions' => 'Impressions',
-                                                        'post_impressions_unique' => 'Reach',
-                                                        'post_impressions_fan' => 'Follower impressions',
-                                                        'post_impressions_organic' => 'Organic impressions',
+                                                        'post_media_view' => 'Views',
+                                                        'post_total_media_view_unique' => 'Reach',
+                                                        'views_from_followers' => 'From followers',
+                                                        'views_from_non_followers' => 'From non-followers',
                                                         'post_video_views' => 'Video views',
                                                         'post_video_views_unique' => 'Unique video views',
-                                                        'post_media_view' => 'Media views',
-                                                        'total_video_views' => 'Total views',
-                                                        'total_video_impressions' => 'Total impressions',
-                                                        'total_video_views_unique' => 'Unique views',
+                                                        'post_video_avg_time_watched' => 'Avg watch (ms)',
+                                                        'post_clicks' => 'Clicks',
                                                     ] as $key => $label)
-                                                        @if (!is_null($post->insightValue($key)))
+                                                        @if (is_numeric($post->insightValue($key)))
                                                             <span class="inline-flex items-center rounded bg-gray-100 px-2 py-1">
                                                                 {{ $label }}: <strong class="ml-1">{{ number_format((float) $post->insightValue($key)) }}</strong>
                                                             </span>

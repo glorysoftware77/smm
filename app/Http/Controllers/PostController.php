@@ -195,38 +195,56 @@ class PostController extends Controller
                 ->with('error', 'Only published posts can fetch insights.');
         }
 
-        $objectId = $post->facebook_post_id ?: $post->facebook_video_id;
+        $candidates = [];
 
-        if (! $objectId) {
+        if ($post->facebook_post_id) {
+            $candidates[] = str_contains($post->facebook_post_id, '_')
+                ? $post->facebook_post_id
+                : $post->socialPage->page_id.'_'.$post->facebook_post_id;
+        }
+
+        if ($post->facebook_video_id) {
+            $candidates[] = $post->socialPage->page_id.'_'.$post->facebook_video_id;
+            $candidates[] = $post->facebook_video_id;
+        }
+
+        $candidates = array_values(array_unique($candidates));
+
+        if ($candidates === []) {
             return redirect()
                 ->route('posts.create')
                 ->with('error', 'No Facebook post/video ID stored for this item.');
         }
 
-        // Page post IDs are often pageId_postId.
-        if ($post->facebook_post_id && ! str_contains($post->facebook_post_id, '_')) {
-            $objectId = $post->socialPage->page_id.'_'.$post->facebook_post_id;
+        $insights = [];
+        $lastError = null;
+
+        foreach ($candidates as $objectId) {
+            try {
+                $insights = $facebook->getPagePostInsights($objectId, $post->socialPage->access_token);
+
+                if ($insights !== []) {
+                    break;
+                }
+            } catch (Throwable $e) {
+                $lastError = $e;
+            }
         }
 
-        try {
-            $insights = $facebook->getPagePostInsights($objectId, $post->socialPage->access_token);
-
-            // If post insights empty, try video id.
-            if ($insights === [] && $post->facebook_video_id) {
-                $insights = $facebook->getPagePostInsights($post->facebook_video_id, $post->socialPage->access_token);
+        if ($insights === []) {
+            if ($lastError) {
+                report($lastError);
             }
-
-            $post->update([
-                'insights' => $insights,
-                'insights_fetched_at' => now(),
-            ]);
-        } catch (Throwable $e) {
-            report($e);
 
             return redirect()
                 ->route('posts.create')
-                ->with('error', 'Insights failed: '.$e->getMessage());
+                ->with('error', 'Insights not available yet'.($lastError ? ': '.$lastError->getMessage() : '.'));
         }
+
+        $post->update([
+            'insights' => $insights,
+            'insights_fetched_at' => now(),
+        ]);
 
         return redirect()
             ->route('posts.create')
