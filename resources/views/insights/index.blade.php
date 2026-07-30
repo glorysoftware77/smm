@@ -1,5 +1,5 @@
 @php
-    $tabs = ['facebook' => 'Facebook', 'instagram' => 'Instagram'];
+    $tabs = ['facebook' => 'Facebook', 'instagram' => 'Instagram', 'youtube' => 'YouTube'];
     $fmt = fn ($value) => is_numeric($value) ? number_format((float) $value) : '—';
 @endphp
 
@@ -49,6 +49,8 @@
                     {{ $error }}
                     @if ($platform === 'instagram')
                         <a href="{{ route('dashboard') }}" class="ml-1 font-medium underline">Reconnect Instagram</a>
+                    @elseif ($platform === 'youtube')
+                        <a href="{{ route('dashboard') }}" class="ml-1 font-medium underline">Reconnect YouTube</a>
                     @endif
                 </div>
             @endif
@@ -56,14 +58,18 @@
             <div class="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
                 @foreach ([
                     'Views' => $summary['views'],
-                    'Reach' => $summary['reach'],
-                    $platform === 'facebook' ? 'Followers views' : 'Posts' => $platform === 'facebook'
+                    $platform === 'youtube' ? 'Videos' : 'Reach' => $platform === 'youtube'
+                        ? $summary['total']
+                        : $summary['reach'],
+                    $platform === 'facebook' ? 'Followers views' : ($platform === 'youtube' ? 'Watch mins' : 'Posts') => $platform === 'facebook'
                         ? $summary['from_followers']
-                        : $summary['total'],
+                        : ($platform === 'youtube'
+                            ? (int) ($pageStats['watch_minutes'] ?? 0)
+                            : $summary['total']),
                     $platform === 'facebook' ? 'Non-followers' : 'From SMM' => $platform === 'facebook'
                         ? $summary['from_non_followers']
                         : $summary['from_app'],
-                    $platform === 'instagram' ? 'Likes' : 'Reactions' => $summary['reactions'],
+                    in_array($platform, ['instagram', 'youtube'], true) ? 'Likes' : 'Reactions' => $summary['reactions'],
                     'Comments' => $summary['comments'],
                     'Shares' => $summary['shares'],
                 ] as $label => $value)
@@ -76,7 +82,7 @@
 
             @if ($pageStats)
                 <div class="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm">
-                    <span class="text-gray-500">{{ $platform === 'instagram' ? 'Instagram followers' : 'Page followers' }}:
+                    <span class="text-gray-500">{{ $platform === 'youtube' ? 'Subscribers' : ($platform === 'instagram' ? 'Instagram followers' : 'Page followers') }}:
                         <strong class="text-gray-900">{{ $fmt($pageStats['followers']) }}</strong>
                     </span>
                     @if ($platform === 'facebook')
@@ -84,6 +90,13 @@
                             <strong class="text-gray-900">{{ $fmt($pageStats['new_follows']) }}</strong>
                         </span>
                         <span class="text-gray-500">Page views ({{ $range }}d):
+                            <strong class="text-gray-900">{{ $fmt($pageStats['page_views']) }}</strong>
+                        </span>
+                    @elseif ($platform === 'youtube')
+                        <span class="text-gray-500">Net subs ({{ $range }}d):
+                            <strong class="text-gray-900">{{ $fmt($pageStats['new_follows']) }}</strong>
+                        </span>
+                        <span class="text-gray-500">Channel views ({{ $range }}d):
                             <strong class="text-gray-900">{{ $fmt($pageStats['page_views']) }}</strong>
                         </span>
                     @endif
@@ -109,7 +122,7 @@
                                     <th class="px-3 py-2.5 text-right font-medium">Followers</th>
                                     <th class="px-3 py-2.5 text-right font-medium">Non-foll.</th>
                                 @endif
-                                <th class="px-3 py-2.5 text-right font-medium">{{ $platform === 'instagram' ? 'Likes' : 'Reactions' }}</th>
+                                <th class="px-3 py-2.5 text-right font-medium">{{ in_array($platform, ['instagram', 'youtube'], true) ? 'Likes' : 'Reactions' }}</th>
                                 <th class="px-3 py-2.5 text-right font-medium">Comments</th>
                                 <th class="px-3 py-2.5 text-right font-medium">Shares</th>
                                 <th class="px-3 py-2.5 text-right font-medium">Published</th>
@@ -189,7 +202,12 @@
             @endif
 
             <p class="text-xs text-gray-400">
-                Pulled live from your {{ $platform === 'facebook' ? 'Facebook Page' : 'Instagram account' }}, including posts made outside this app.
+                Pulled live from your {{ match ($platform) {
+                    'facebook' => 'Facebook Page',
+                    'instagram' => 'Instagram account',
+                    'youtube' => 'YouTube channel',
+                    default => 'account',
+                } }}, including content made outside this app.
                 Cached for 10 minutes; hit Refresh for the latest.
             </p>
         </div>

@@ -6,6 +6,7 @@ use App\Models\Post;
 use App\Models\SocialPage;
 use App\Services\FacebookService;
 use App\Services\InstagramService;
+use App\Services\YouTubeService;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -27,7 +28,8 @@ class InsightsController extends Controller
     public function index(
         Request $request,
         FacebookService $facebook,
-        InstagramService $instagram
+        InstagramService $instagram,
+        YouTubeService $youtube
     ): View
     {
         $platform = $this->platform($request->string('platform')->toString());
@@ -37,10 +39,12 @@ class InsightsController extends Controller
         $page = $this->connectedPage($request, $platform);
         $error = null;
         $rows = collect();
+        $pageStats = null;
 
         if ($platform === 'facebook' && $page) {
             try {
                 $rows = $this->facebookRows($page, $from, $to, $request->boolean('fresh'));
+                $pageStats = $this->facebookPageStats($page, $facebook, $from, $to);
             } catch (Throwable $e) {
                 report($e);
                 $error = $e->getMessage();
@@ -48,9 +52,17 @@ class InsightsController extends Controller
         } elseif ($platform === 'instagram' && $page) {
             try {
                 $rows = $this->instagramRows($page, $instagram, $from, $to, $request->boolean('fresh'));
+                $pageStats = $this->instagramPageStats($page, $instagram);
             } catch (Throwable $e) {
                 report($e);
                 $error = $this->instagramError($e);
+            }
+        } elseif ($platform === 'youtube' && $page) {
+            try {
+                [$rows, $pageStats] = $this->youtubeRows($page, $youtube, $from, $to, $request->boolean('fresh'));
+            } catch (Throwable $e) {
+                report($e);
+                $error = $this->youtubeError($e);
             }
         } else {
             $rows = $this->localRows($request, $platform, $from, $to);
@@ -62,12 +74,8 @@ class InsightsController extends Controller
             'ranges' => self::RANGES,
             'rangeFrom' => $from,
             'rangeTo' => $to,
-            'pageName' => $page?->name,
-            'pageStats' => match ($platform) {
-                'facebook' => $page ? $this->facebookPageStats($page, $facebook, $from, $to) : null,
-                'instagram' => $page ? $this->instagramPageStats($page, $instagram) : null,
-                default => null,
-            },
+            'pageName' => $page?->name ?? $pageStats['channel_title'] ?? null,
+            'pageStats' => $pageStats,
             'rows' => $rows,
             'summary' => $this->buildSummary($rows),
             'error' => $error,
@@ -214,6 +222,76 @@ class InsightsController extends Controller
     }
 
     /**
+     * @return array{0: Collection<int, array<string, mixed>>, 1: array<string, mixed>}
+     */
+    private function youtubeRows(
+        SocialPage $page,
+        YouTubeService $youtube,
+        Carbon $from,
+        Carbon $to,
+        bool $fresh
+    ): array {
+        $key = $this->cacheKey($page, $from, $to);
+
+        if ($fresh) {
+            Cache::forget($key);
+        }
+
+        $payload = Cache::remember($key, now()->addMinutes(self::CACHE_MINUTES), function () use ($page, $youtube, $from, $to) {
+            $token = $youtube->resolveAccessToken($page);
+
+            return $youtube->getAccountInsights(
+                $token,
+                $page->page_id,
+                $from->timestamp,
+                $to->timestamp,
+            );
+        });
+
+        $appVideoIds = Post::query()
+            ->where('social_page_id', $page->id)
+            ->pluck('facebook_post_id')
+            ->filter()
+            ->map(fn ($id) => (string) $id)
+            ->all();
+
+        $rows = collect($payload['content'] ?? [])
+            ->map(function (array $item) use ($appVideoIds) {
+                return [
+                    'title' => $this->rowTitle($item['title'] ?? null),
+                    'type' => $item['type'] ?? 'VIDEO',
+                    'permalink' => $item['permalink'] ?? null,
+                    'thumbnail' => $item['thumbnail_url'] ?? null,
+                    'published_at' => ! empty($item['published_at']) ? Carbon::parse($item['published_at']) : null,
+                    'views' => is_numeric($item['views'] ?? null) ? (float) $item['views'] : null,
+                    'reach' => null,
+                    'from_followers' => null,
+                    'from_non_followers' => null,
+                    'reactions' => is_numeric($item['likes'] ?? null) ? (float) $item['likes'] : null,
+                    'comments' => is_numeric($item['comments'] ?? null) ? (float) $item['comments'] : null,
+                    'shares' => is_numeric($item['shares'] ?? null) ? (float) $item['shares'] : null,
+                    'from_app' => in_array((string) ($item['id'] ?? ''), $appVideoIds, true),
+                ];
+            })
+            ->sortByDesc(fn (array $row) => $row['published_at']?->timestamp ?? 0)
+            ->values();
+
+        $summary = $payload['summary'] ?? [];
+        $gained = (int) ($summary['subscribersGained'] ?? 0);
+        $lost = (int) ($summary['subscribersLost'] ?? 0);
+
+        $pageStats = [
+            'followers' => $summary['subscribers'] ?? null,
+            'new_follows' => $gained - $lost,
+            'page_views' => $summary['views'] ?? null,
+            'channel_title' => $summary['channel_title'] ?? null,
+            'watch_minutes' => $summary['estimatedMinutesWatched'] ?? null,
+        ];
+
+        return [$rows, $pageStats];
+    }
+
+    /**
      * Fallback for platforms without a content API wired up yet.
      */
     private function localRows(Request $request, string $platform, Carbon $from, Carbon $to): Collection
@@ -338,6 +416,20 @@ class InsightsController extends Controller
         return $message;
     }
 
+    private function youtubeError(Throwable $error): string
+    {
+        $message = $error->getMessage();
+
+        if (str_contains($message, 'insufficientPermissions')
+            || str_contains($message, 'ACCESS_TOKEN_SCOPE_INSUFFICIENT')
+            || str_contains($message, 'yt-analytics')
+            || str_contains($message, 'insufficient authentication scopes')) {
+            return 'YouTube Analytics permission is missing. Reconnect YouTube from Dashboard after enabling yt-analytics.readonly.';
+        }
+
+        return $message;
+    }
+
     /**
      * @param  array<string, mixed>  $insights
      * @param  array<int, string>  $keys
@@ -366,7 +458,7 @@ class InsightsController extends Controller
 
     private function platform(?string $value): string
     {
-        return in_array($value, ['facebook', 'instagram'], true) ? $value : 'facebook';
+        return in_array($value, ['facebook', 'instagram', 'youtube'], true) ? $value : 'facebook';
     }
 
     private function range(int $value): int
