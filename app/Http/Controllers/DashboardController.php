@@ -30,28 +30,22 @@ class DashboardController extends Controller
             ->orderBy('name')
             ->get();
 
-        $hasFacebookAccount = $request->user()
-            ->socialAccounts()
-            ->where('provider', 'facebook')
-            ->exists();
-
-        $hasInstagramAccount = $request->user()
-            ->socialAccounts()
-            ->where('provider', 'instagram')
-            ->exists();
-
-        $hasYouTubeAccount = $request->user()
-            ->socialAccounts()
-            ->where('provider', 'youtube')
-            ->exists();
+        $tiktokAccounts = $request->user()
+            ->socialPages()
+            ->where('provider', 'tiktok')
+            ->where('is_connected', true)
+            ->orderBy('name')
+            ->get();
 
         return view('dashboard', [
             'pages' => $pages,
             'instagramAccounts' => $instagramAccounts,
             'youtubeChannels' => $youtubeChannels,
-            'hasFacebookAccount' => $hasFacebookAccount,
-            'hasInstagramAccount' => $hasInstagramAccount,
-            'hasYouTubeAccount' => $hasYouTubeAccount,
+            'tiktokAccounts' => $tiktokAccounts,
+            'hasFacebookAccount' => $request->user()->socialAccounts()->where('provider', 'facebook')->exists(),
+            'hasInstagramAccount' => $request->user()->socialAccounts()->where('provider', 'instagram')->exists(),
+            'hasYouTubeAccount' => $request->user()->socialAccounts()->where('provider', 'youtube')->exists(),
+            'hasTikTokAccount' => $request->user()->socialAccounts()->where('provider', 'tiktok')->exists(),
         ]);
     }
 }

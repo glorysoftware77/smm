@@ -7,6 +7,7 @@ use App\Models\SocialAccount;
 use App\Models\SocialPage;
 use App\Services\FacebookService;
 use App\Services\InstagramService;
+use App\Services\TikTokService;
 use App\Services\YouTubeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -23,7 +24,7 @@ class PostController extends Controller
     {
         $pages = $request->user()
             ->socialPages()
-            ->whereIn('provider', ['facebook', 'instagram', 'youtube'])
+            ->whereIn('provider', ['facebook', 'instagram', 'youtube', 'tiktok'])
             ->where('is_connected', true)
             ->orderBy('provider')
             ->orderBy('name')
@@ -41,7 +42,8 @@ class PostController extends Controller
         Request $request,
         FacebookService $facebook,
         InstagramService $instagram,
-        YouTubeService $youtube
+        YouTubeService $youtube,
+        TikTokService $tiktok
     ): JsonResponse|RedirectResponse {
         $validated = $request->validate([
             'social_page_id' => ['required', 'exists:social_pages,id'],
@@ -53,6 +55,7 @@ class PostController extends Controller
             'media_type' => ['nullable', 'in:none,image,video'],
             'youtube_privacy' => ['nullable', 'in:private,unlisted,public'],
             'youtube_as_short' => ['nullable', 'boolean'],
+            'tiktok_privacy' => ['nullable', 'in:SELF_ONLY,PUBLIC_TO_EVERYONE,MUTUAL_FOLLOW_FRIENDS,FOLLOWER_OF_CREATOR'],
         ]);
 
         if ($request->hasFile('image') && $request->hasFile('video')) {
@@ -73,8 +76,8 @@ class PostController extends Controller
             return $this->fail($request, 'Instagram requires an image or video.');
         }
 
-        if ($page->provider === 'youtube' && $mediaType !== 'video') {
-            return $this->fail($request, 'YouTube requires a video file.');
+        if (in_array($page->provider, ['youtube', 'tiktok'], true) && $mediaType !== 'video') {
+            return $this->fail($request, ucfirst($page->provider).' requires a video file.');
         }
 
         if ($page->provider === 'facebook' && ! $hasMessage && $mediaType === 'none') {
@@ -83,6 +86,7 @@ class PostController extends Controller
 
         $postFormat = match (true) {
             $page->provider === 'youtube' && $mediaType === 'video' => $request->boolean('youtube_as_short') ? 'short' : 'video',
+            $page->provider === 'tiktok' && $mediaType === 'video' => 'video',
             $mediaType === 'video' => 'reel',
             default => 'standard',
         };
@@ -102,6 +106,7 @@ class PostController extends Controller
             'facebook' => 'Facebook',
             'instagram' => 'Instagram',
             'youtube' => 'YouTube',
+            'tiktok' => 'TikTok',
             default => ucfirst($page->provider),
         };
 
@@ -114,7 +119,8 @@ class PostController extends Controller
                 $request,
                 $facebook,
                 $instagram,
-                $youtube
+                $youtube,
+                $tiktok
             );
 
             $post->update([
@@ -205,8 +211,24 @@ class PostController extends Controller
         Request $request,
         FacebookService $facebook,
         InstagramService $instagram,
-        YouTubeService $youtube
+        YouTubeService $youtube,
+        TikTokService $tiktok
     ): array {
+        if ($page->provider === 'tiktok') {
+            $accessToken = $tiktok->resolveAccessToken($page);
+            $absolutePath = Storage::disk('public')->path($mediaPath);
+            $title = $validated['title'] ?: ($validated['message'] ? Str::limit($validated['message'], 140) : 'Untitled');
+
+            $result = $tiktok->publishVideo(
+                $accessToken,
+                $absolutePath,
+                $title,
+                $validated['tiktok_privacy'] ?? 'SELF_ONLY'
+            );
+
+            return [$result['publish_id'] ?? null, null];
+        }
+
         if ($page->provider === 'youtube') {
             $accessToken = $this->youtubeAccessToken($page, $youtube);
             $absolutePath = Storage::disk('public')->path($mediaPath);

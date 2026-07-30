@@ -222,6 +222,66 @@
                     @endif
                 </div>
             </div>
+
+            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+                <div class="p-6 text-gray-900 space-y-4">
+                    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <h3 class="text-lg font-medium">TikTok Accounts</h3>
+                            <p class="text-sm text-gray-600 mt-1">
+                                Connect TikTok Login Kit to publish videos. Until audit, posts are private (SELF_ONLY) and your TikTok account should be private while testing.
+                            </p>
+                        </div>
+
+                        <div class="flex flex-wrap gap-2">
+                            <a href="{{ route('tiktok.redirect') }}"
+                               class="inline-flex items-center px-4 py-2 bg-gray-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition">
+                                {{ $hasTikTokAccount ? 'Reconnect TikTok' : 'Connect TikTok' }}
+                            </a>
+
+                            @if ($hasTikTokAccount)
+                                <form method="POST" action="{{ route('tiktok.disconnect') }}"
+                                      onsubmit="return confirm('Disconnect TikTok?');">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit"
+                                            class="inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition">
+                                        Disconnect
+                                    </button>
+                                </form>
+                            @endif
+                        </div>
+                    </div>
+
+                    @if ($tiktokAccounts->isEmpty())
+                        <p class="text-sm text-gray-500 border-t border-gray-100 pt-4">
+                            No TikTok accounts linked yet.
+                        </p>
+                    @else
+                        <ul class="divide-y divide-gray-100 border-t border-gray-100">
+                            @foreach ($tiktokAccounts as $account)
+                                <li class="py-4 flex items-center justify-between gap-4">
+                                    <div class="flex items-center gap-3 min-w-0">
+                                        @if ($account->picture_url)
+                                            <img src="{{ $account->picture_url }}" alt="" class="h-10 w-10 rounded-full object-cover">
+                                        @else
+                                            <div class="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center text-sm font-medium text-gray-600">
+                                                TT
+                                            </div>
+                                        @endif
+                                        <div class="min-w-0">
+                                            <div class="font-medium text-gray-900 truncate">{{ $account->name }}</div>
+                                            <div class="text-sm text-gray-500 truncate">
+                                                TikTok · ID {{ $account->page_id }}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </li>
+                            @endforeach
+                        </ul>
+                    @endif
+                </div>
+            </div>
         </div>
     </div>
 </x-app-layout>

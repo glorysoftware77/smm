@@ -7,6 +7,7 @@
             'facebook' => 'Facebook',
             'instagram' => 'Instagram',
             'youtube' => 'YouTube',
+            'tiktok' => 'TikTok',
             default => ucfirst($page->provider),
         },
     ])->values();
@@ -25,7 +26,7 @@
                 <div class="p-6 text-gray-900">
                     @if ($pages->isEmpty())
                         <p class="text-sm text-gray-600">
-                            Connect a Facebook Page, Instagram, or YouTube channel first from the
+                            Connect Facebook, Instagram, YouTube, or TikTok first from the
                             <a href="{{ route('dashboard') }}" class="text-indigo-600 underline">Dashboard</a>.
                         </p>
                     @else
@@ -55,13 +56,13 @@
                                         </template>
                                     </div>
                                     <p class="mt-1 text-xs text-gray-500">
-                                        Select one or more. Facebook videos → Reels. Instagram needs image/video. YouTube needs video.
+                                        Select one or more. FB videos → Reels. IG needs image/video. YouTube & TikTok need video.
                                     </p>
                                     <p x-show="error && !statuses.length" class="mt-2 text-sm text-red-600" x-text="error"></p>
                                 </div>
 
                                 <div>
-                                    <x-input-label for="title" :value="__('Title (YouTube / Facebook Reels)')" />
+                                    <x-input-label for="title" :value="__('Title (YouTube / TikTok / FB Reels)')" />
                                     <x-text-input id="title" name="title" class="mt-1 block w-full" x-model="title" />
                                 </div>
 
@@ -77,7 +78,7 @@
                                     <input id="image" name="image" type="file" accept="image/jpeg,image/png,image/gif,image/webp"
                                            class="mt-1 block w-full text-sm text-gray-700"
                                            @change="imageFile = $event.target.files[0] || null">
-                                    <p class="mt-1 text-xs text-gray-500">JPG, PNG, GIF, WebP — max 10MB (not used for YouTube)</p>
+                                    <p class="mt-1 text-xs text-gray-500">JPG, PNG, GIF, WebP — max 10MB (not used for YouTube / TikTok)</p>
                                 </div>
 
                                 <div>
@@ -105,6 +106,22 @@
                                                class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500">
                                         Publish as YouTube Short (adds #Shorts to title)
                                     </label>
+                                </div>
+
+                                <div class="rounded-md border border-gray-200 p-4 space-y-3"
+                                     x-show="selectedProviders.includes('tiktok')" x-cloak>
+                                    <div class="text-sm font-medium text-gray-800">TikTok options</div>
+                                    <div>
+                                        <x-input-label for="tiktok_privacy" :value="__('Privacy')" />
+                                        <select id="tiktok_privacy" x-model="tiktokPrivacy"
+                                                class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm">
+                                            <option value="SELF_ONLY">Private (SELF_ONLY) — required until audit</option>
+                                            <option value="PUBLIC_TO_EVERYONE">Public</option>
+                                            <option value="MUTUAL_FOLLOW_FRIENDS">Friends</option>
+                                            <option value="FOLLOWER_OF_CREATOR">Followers</option>
+                                        </select>
+                                    </div>
+                                    <p class="text-xs text-gray-500">Unaudited apps must use SELF_ONLY. Keep the TikTok account private while testing.</p>
                                 </div>
 
                                 <div class="flex items-center gap-3">
@@ -158,6 +175,7 @@
                     videoFile: null,
                     youtubePrivacy: 'private',
                     youtubeAsShort: false,
+                    tiktokPrivacy: 'SELF_ONLY',
                     publishing: false,
                     done: false,
                     error: '',
@@ -196,6 +214,10 @@
                             this.error = 'YouTube requires a video file.';
                             return;
                         }
+                        if (targets.some(p => p.provider === 'tiktok') && !this.videoFile) {
+                            this.error = 'TikTok requires a video file.';
+                            return;
+                        }
                         if (targets.some(p => p.provider === 'instagram') && !this.imageFile && !this.videoFile) {
                             this.error = 'Instagram requires an image or video.';
                             return;
@@ -228,6 +250,7 @@
                             body.append('message', this.message || '');
                             body.append('youtube_privacy', this.youtubePrivacy);
                             if (this.youtubeAsShort) body.append('youtube_as_short', '1');
+                            body.append('tiktok_privacy', this.tiktokPrivacy);
 
                             if (mediaPath) {
                                 body.append('media_path', mediaPath);
