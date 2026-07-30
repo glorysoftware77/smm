@@ -3,11 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Models\Post;
+use App\Models\SocialAccount;
 use App\Models\SocialPage;
 use App\Services\FacebookService;
 use App\Services\InstagramService;
+use App\Services\YouTubeService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use Throwable;
@@ -18,7 +21,7 @@ class PostController extends Controller
     {
         $pages = $request->user()
             ->socialPages()
-            ->whereIn('provider', ['facebook', 'instagram'])
+            ->whereIn('provider', ['facebook', 'instagram', 'youtube'])
             ->where('is_connected', true)
             ->orderBy('provider')
             ->orderBy('name')
@@ -37,14 +40,20 @@ class PostController extends Controller
         ]);
     }
 
-    public function store(Request $request, FacebookService $facebook, InstagramService $instagram): RedirectResponse
-    {
+    public function store(
+        Request $request,
+        FacebookService $facebook,
+        InstagramService $instagram,
+        YouTubeService $youtube
+    ): RedirectResponse {
         $validated = $request->validate([
             'social_page_id' => ['required', 'exists:social_pages,id'],
             'title' => ['nullable', 'string', 'max:255'],
-            'message' => ['nullable', 'string', 'max:2200'],
+            'message' => ['nullable', 'string', 'max:5000'],
             'image' => ['nullable', 'file', 'mimes:jpg,jpeg,png,gif,webp', 'max:10240'],
             'video' => ['nullable', 'file', 'mimes:mp4,mov,avi', 'max:102400'],
+            'youtube_privacy' => ['nullable', 'in:private,unlisted,public'],
+            'youtube_as_short' => ['nullable', 'boolean'],
         ]);
 
         if ($request->hasFile('image') && $request->hasFile('video')) {
@@ -65,6 +74,10 @@ class PostController extends Controller
             return back()->withInput()->with('error', 'Instagram requires an image or video. Text-only posts are not supported.');
         }
 
+        if ($page->provider === 'youtube' && ! $hasVideo) {
+            return back()->withInput()->with('error', 'YouTube requires a video file.');
+        }
+
         if ($page->provider === 'facebook' && ! $hasMessage && ! $hasImage && ! $hasVideo) {
             return back()->withInput()->with('error', 'Add text, an image, or a video before publishing.');
         }
@@ -78,7 +91,9 @@ class PostController extends Controller
             $mediaPath = $request->file('image')->store('posts/'.$request->user()->id, 'public');
         } elseif ($hasVideo) {
             $mediaType = 'video';
-            $postFormat = 'reel';
+            $postFormat = $page->provider === 'youtube'
+                ? ($request->boolean('youtube_as_short') ? 'short' : 'video')
+                : 'reel';
             $mediaPath = $request->file('video')->store('posts/'.$request->user()->id, 'public');
         }
 
@@ -94,7 +109,23 @@ class PostController extends Controller
         ]);
 
         try {
-            if ($page->provider === 'instagram') {
+            if ($page->provider === 'youtube') {
+                $accessToken = $this->youtubeAccessToken($page, $youtube);
+                $absolutePath = Storage::disk('public')->path($mediaPath);
+                $privacy = $validated['youtube_privacy'] ?? 'private';
+
+                $result = $youtube->uploadVideo(
+                    $accessToken,
+                    $absolutePath,
+                    $validated['title'] ?: ($validated['message'] ? \Illuminate\Support\Str::limit($validated['message'], 80) : 'Untitled'),
+                    $validated['message'] ?? null,
+                    $privacy,
+                    $request->boolean('youtube_as_short')
+                );
+
+                $facebookPostId = $result['id'] ?? null;
+                $facebookVideoId = null;
+            } elseif ($page->provider === 'instagram') {
                 $publicUrl = Storage::disk('public')->url($mediaPath);
                 if (! str_starts_with($publicUrl, 'http')) {
                     $publicUrl = rtrim(config('app.url'), '/').$publicUrl;
@@ -172,11 +203,48 @@ class PostController extends Controller
                 ->with('error', 'Publish failed: '.$e->getMessage());
         }
 
-        $label = $postFormat === 'reel' ? 'Reel' : 'Post';
+        $label = match ($postFormat) {
+            'short' => 'Short',
+            'reel' => 'Reel',
+            'video' => 'Video',
+            default => 'Post',
+        };
+
+        $privacyNote = $page->provider === 'youtube'
+            ? ' (privacy: '.($validated['youtube_privacy'] ?? 'private').'; — unaudited apps may stay private)'
+            : '';
 
         return redirect()
             ->route('posts.create')
-            ->with('success', $label.' published to '.$page->name.'.');
+            ->with('success', $label.' published to '.$page->name.$privacyNote.'.');
+    }
+
+    private function youtubeAccessToken(SocialPage $page, YouTubeService $youtube): string
+    {
+        $account = $page->socialAccount;
+
+        if (! $account instanceof SocialAccount) {
+            return $page->access_token;
+        }
+
+        $expiresAt = $account->token_expires_at;
+        $stillValid = $expiresAt instanceof Carbon && $expiresAt->isAfter(now()->addMinutes(2));
+
+        if ($stillValid || ! $account->refresh_token) {
+            return $account->access_token ?: $page->access_token;
+        }
+
+        $refreshed = $youtube->refreshAccessToken($account->refresh_token);
+        $accessToken = $refreshed['access_token'];
+
+        $account->update([
+            'access_token' => $accessToken,
+            'token_expires_at' => now()->addSeconds((int) ($refreshed['expires_in'] ?? 3600)),
+        ]);
+
+        $page->update(['access_token' => $accessToken]);
+
+        return $accessToken;
     }
 
     public function refreshInsights(Request $request, Post $post, FacebookService $facebook): RedirectResponse

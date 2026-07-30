@@ -162,6 +162,66 @@
                     @endif
                 </div>
             </div>
+
+            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+                <div class="p-6 text-gray-900 space-y-4">
+                    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <h3 class="text-lg font-medium">YouTube Channels</h3>
+                            <p class="text-sm text-gray-600 mt-1">
+                                Connect Google OAuth to upload videos and Shorts. Unaudited apps stay private until Google audit.
+                            </p>
+                        </div>
+
+                        <div class="flex flex-wrap gap-2">
+                            <a href="{{ route('youtube.redirect') }}"
+                               class="inline-flex items-center px-4 py-2 bg-gray-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition">
+                                {{ $hasYouTubeAccount ? 'Reconnect YouTube' : 'Connect YouTube' }}
+                            </a>
+
+                            @if ($hasYouTubeAccount)
+                                <form method="POST" action="{{ route('youtube.disconnect') }}"
+                                      onsubmit="return confirm('Disconnect YouTube?');">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit"
+                                            class="inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition">
+                                        Disconnect
+                                    </button>
+                                </form>
+                            @endif
+                        </div>
+                    </div>
+
+                    @if ($youtubeChannels->isEmpty())
+                        <p class="text-sm text-gray-500 border-t border-gray-100 pt-4">
+                            No YouTube channels linked yet.
+                        </p>
+                    @else
+                        <ul class="divide-y divide-gray-100 border-t border-gray-100">
+                            @foreach ($youtubeChannels as $channel)
+                                <li class="py-4 flex items-center justify-between gap-4">
+                                    <div class="flex items-center gap-3 min-w-0">
+                                        @if ($channel->picture_url)
+                                            <img src="{{ $channel->picture_url }}" alt="" class="h-10 w-10 rounded-full object-cover">
+                                        @else
+                                            <div class="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center text-sm font-medium text-gray-600">
+                                                YT
+                                            </div>
+                                        @endif
+                                        <div class="min-w-0">
+                                            <div class="font-medium text-gray-900 truncate">{{ $channel->name }}</div>
+                                            <div class="text-sm text-gray-500 truncate">
+                                                YouTube · ID {{ $channel->page_id }}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </li>
+                            @endforeach
+                        </ul>
+                    @endif
+                </div>
+            </div>
         </div>
     </div>
 </x-app-layout>

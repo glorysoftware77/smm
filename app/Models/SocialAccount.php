@@ -13,6 +13,7 @@ class SocialAccount extends Model
         'provider',
         'provider_user_id',
         'access_token',
+        'refresh_token',
         'token_expires_at',
         'name',
     ];
@@ -21,6 +22,7 @@ class SocialAccount extends Model
     {
         return [
             'access_token' => 'encrypted',
+            'refresh_token' => 'encrypted',
             'token_expires_at' => 'datetime',
         ];
     }

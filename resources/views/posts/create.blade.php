@@ -23,7 +23,7 @@
                 <div class="p-6 text-gray-900">
                     @if ($pages->isEmpty())
                         <p class="text-sm text-gray-600">
-                            Connect a Facebook Page or Instagram account first from the
+                            Connect a Facebook Page, Instagram, or YouTube channel first from the
                             <a href="{{ route('dashboard') }}" class="text-indigo-600 underline">Dashboard</a>.
                         </p>
                     @else
@@ -42,19 +42,19 @@
                                     @endforeach
                                 </select>
                                 <p class="mt-1 text-xs text-gray-500">
-                                    Facebook videos publish as <strong>Reels</strong>. Instagram requires image or video.
+                                    Facebook videos → Reels. Instagram needs image/video. YouTube needs video (Shorts optional).
                                 </p>
                                 <x-input-error :messages="$errors->get('social_page_id')" class="mt-2" />
                             </div>
 
                             <div>
-                                <x-input-label for="title" :value="__('Title (Facebook Reels, optional)')" />
+                                <x-input-label for="title" :value="__('Title (YouTube / Facebook Reels)')" />
                                 <x-text-input id="title" name="title" class="mt-1 block w-full" :value="old('title')" />
                                 <x-input-error :messages="$errors->get('title')" class="mt-2" />
                             </div>
 
                             <div>
-                                <x-input-label for="message" :value="__('Message / Caption')" />
+                                <x-input-label for="message" :value="__('Message / Caption / Description')" />
                                 <textarea id="message" name="message" rows="5"
                                           class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"
                                           placeholder="Write your post...">{{ old('message') }}</textarea>
@@ -65,20 +65,40 @@
                                 <x-input-label for="image" :value="__('Image (optional)')" />
                                 <input id="image" name="image" type="file" accept="image/jpeg,image/png,image/gif,image/webp"
                                        class="mt-1 block w-full text-sm text-gray-700">
-                                <p class="mt-1 text-xs text-gray-500">JPG, PNG, GIF, WebP — max 10MB</p>
+                                <p class="mt-1 text-xs text-gray-500">JPG, PNG, GIF, WebP — max 10MB (not used for YouTube)</p>
                                 <x-input-error :messages="$errors->get('image')" class="mt-2" />
                             </div>
 
                             <div>
-                                <x-input-label for="video" :value="__('Reel video (optional)')" />
+                                <x-input-label for="video" :value="__('Video (optional)')" />
                                 <input id="video" name="video" type="file" accept="video/mp4,video/quicktime,video/x-msvideo"
                                        class="mt-1 block w-full text-sm text-gray-700">
                                 <p class="mt-1 text-xs text-gray-500">
-                                    MP4 / MOV — max 100MB. For best reach: 9:16, 3–90 seconds, min 540x960.
+                                    MP4 / MOV — max 100MB. Shorts tip: 9:16, under 60s.
                                 </p>
                                 <x-input-error :messages="$errors->get('video')" class="mt-2" />
                             </div>
 
+                            <div class="rounded-md border border-gray-200 p-4 space-y-3">
+                                <div class="text-sm font-medium text-gray-800">YouTube options</div>
+                                <div>
+                                    <x-input-label for="youtube_privacy" :value="__('Privacy')" />
+                                    <select id="youtube_privacy" name="youtube_privacy"
+                                            class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm">
+                                        <option value="private" @selected(old('youtube_privacy', 'private') === 'private')>Private</option>
+                                        <option value="unlisted" @selected(old('youtube_privacy') === 'unlisted')>Unlisted</option>
+                                        <option value="public" @selected(old('youtube_privacy') === 'public')>Public</option>
+                                    </select>
+                                    <p class="mt-1 text-xs text-gray-500">
+                                        Until Google audits the app, uploads are forced to private.
+                                    </p>
+                                </div>
+                                <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+                                    <input type="checkbox" name="youtube_as_short" value="1" @checked(old('youtube_as_short'))
+                                           class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500">
+                                    Publish as YouTube Short (adds #Shorts to title)
+                                </label>
+                            </div>
                             <div class="flex items-center gap-3">
                                 <x-primary-button>
                                     {{ __('Publish now') }}

@@ -23,6 +23,13 @@ class DashboardController extends Controller
             ->orderBy('name')
             ->get();
 
+        $youtubeChannels = $request->user()
+            ->socialPages()
+            ->where('provider', 'youtube')
+            ->where('is_connected', true)
+            ->orderBy('name')
+            ->get();
+
         $hasFacebookAccount = $request->user()
             ->socialAccounts()
             ->where('provider', 'facebook')
@@ -33,11 +40,18 @@ class DashboardController extends Controller
             ->where('provider', 'instagram')
             ->exists();
 
+        $hasYouTubeAccount = $request->user()
+            ->socialAccounts()
+            ->where('provider', 'youtube')
+            ->exists();
+
         return view('dashboard', [
             'pages' => $pages,
             'instagramAccounts' => $instagramAccounts,
+            'youtubeChannels' => $youtubeChannels,
             'hasFacebookAccount' => $hasFacebookAccount,
             'hasInstagramAccount' => $hasInstagramAccount,
+            'hasYouTubeAccount' => $hasYouTubeAccount,
         ]);
     }
 }

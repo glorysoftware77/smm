@@ -6,6 +6,7 @@ use App\Http\Controllers\InsightsController;
 use App\Http\Controllers\InstagramConnectController;
 use App\Http\Controllers\PostController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\YouTubeConnectController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -35,6 +36,10 @@ Route::middleware('auth')->group(function () {
     Route::get('/instagram/redirect', [InstagramConnectController::class, 'redirect'])->name('instagram.redirect');
     Route::get('/instagram/callback', [InstagramConnectController::class, 'callback'])->name('instagram.callback');
     Route::delete('/instagram/disconnect', [InstagramConnectController::class, 'disconnectAccount'])->name('instagram.disconnect');
+
+    Route::get('/youtube/redirect', [YouTubeConnectController::class, 'redirect'])->name('youtube.redirect');
+    Route::get('/youtube/callback', [YouTubeConnectController::class, 'callback'])->name('youtube.callback');
+    Route::delete('/youtube/disconnect', [YouTubeConnectController::class, 'disconnectAccount'])->name('youtube.disconnect');
 
     Route::get('/posts/create', [PostController::class, 'create'])->name('posts.create');
     Route::post('/posts', [PostController::class, 'store'])->name('posts.store');
