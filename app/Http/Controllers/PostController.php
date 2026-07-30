@@ -8,10 +8,12 @@ use App\Models\SocialPage;
 use App\Services\FacebookService;
 use App\Services\InstagramService;
 use App\Services\YouTubeService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Throwable;
 
@@ -27,37 +29,34 @@ class PostController extends Controller
             ->orderBy('name')
             ->get();
 
-        $recentPosts = $request->user()
-            ->posts()
-            ->with('socialPage')
-            ->latest()
-            ->limit(15)
-            ->get();
-
         return view('posts.create', [
             'pages' => $pages,
-            'recentPosts' => $recentPosts,
         ]);
     }
 
+    /**
+     * Publish to one selected account. Call repeatedly (AJAX) for multi-platform.
+     */
     public function store(
         Request $request,
         FacebookService $facebook,
         InstagramService $instagram,
         YouTubeService $youtube
-    ): RedirectResponse {
+    ): JsonResponse|RedirectResponse {
         $validated = $request->validate([
             'social_page_id' => ['required', 'exists:social_pages,id'],
             'title' => ['nullable', 'string', 'max:255'],
             'message' => ['nullable', 'string', 'max:5000'],
             'image' => ['nullable', 'file', 'mimes:jpg,jpeg,png,gif,webp', 'max:10240'],
             'video' => ['nullable', 'file', 'mimes:mp4,mov,avi', 'max:102400'],
+            'media_path' => ['nullable', 'string', 'max:500'],
+            'media_type' => ['nullable', 'in:none,image,video'],
             'youtube_privacy' => ['nullable', 'in:private,unlisted,public'],
             'youtube_as_short' => ['nullable', 'boolean'],
         ]);
 
         if ($request->hasFile('image') && $request->hasFile('video')) {
-            return back()->withInput()->with('error', 'Choose either an image or a video, not both.');
+            return $this->fail($request, 'Choose either an image or a video, not both.');
         }
 
         $page = SocialPage::query()
@@ -66,36 +65,27 @@ class PostController extends Controller
             ->where('is_connected', true)
             ->firstOrFail();
 
-        $hasImage = $request->hasFile('image');
-        $hasVideo = $request->hasFile('video');
-        $hasMessage = $request->filled('message');
+        [$mediaType, $mediaPath] = $this->resolveMedia($request, $validated);
 
-        if ($page->provider === 'instagram' && ! $hasImage && ! $hasVideo) {
-            return back()->withInput()->with('error', 'Instagram requires an image or video. Text-only posts are not supported.');
+        $hasMessage = filled($validated['message'] ?? null);
+
+        if ($page->provider === 'instagram' && ! in_array($mediaType, ['image', 'video'], true)) {
+            return $this->fail($request, 'Instagram requires an image or video.');
         }
 
-        if ($page->provider === 'youtube' && ! $hasVideo) {
-            return back()->withInput()->with('error', 'YouTube requires a video file.');
+        if ($page->provider === 'youtube' && $mediaType !== 'video') {
+            return $this->fail($request, 'YouTube requires a video file.');
         }
 
-        if ($page->provider === 'facebook' && ! $hasMessage && ! $hasImage && ! $hasVideo) {
-            return back()->withInput()->with('error', 'Add text, an image, or a video before publishing.');
+        if ($page->provider === 'facebook' && ! $hasMessage && $mediaType === 'none') {
+            return $this->fail($request, 'Add text, an image, or a video before publishing.');
         }
 
-        $mediaType = 'none';
-        $mediaPath = null;
-        $postFormat = 'standard';
-
-        if ($hasImage) {
-            $mediaType = 'image';
-            $mediaPath = $request->file('image')->store('posts/'.$request->user()->id, 'public');
-        } elseif ($hasVideo) {
-            $mediaType = 'video';
-            $postFormat = $page->provider === 'youtube'
-                ? ($request->boolean('youtube_as_short') ? 'short' : 'video')
-                : 'reel';
-            $mediaPath = $request->file('video')->store('posts/'.$request->user()->id, 'public');
-        }
+        $postFormat = match (true) {
+            $page->provider === 'youtube' && $mediaType === 'video' => $request->boolean('youtube_as_short') ? 'short' : 'video',
+            $mediaType === 'video' => 'reel',
+            default => 'standard',
+        };
 
         $post = Post::query()->create([
             'user_id' => $request->user()->id,
@@ -108,85 +98,29 @@ class PostController extends Controller
             'status' => 'pending',
         ]);
 
+        $providerLabel = match ($page->provider) {
+            'facebook' => 'Facebook',
+            'instagram' => 'Instagram',
+            'youtube' => 'YouTube',
+            default => ucfirst($page->provider),
+        };
+
         try {
-            if ($page->provider === 'youtube') {
-                $accessToken = $this->youtubeAccessToken($page, $youtube);
-                $absolutePath = Storage::disk('public')->path($mediaPath);
-                $privacy = $validated['youtube_privacy'] ?? 'private';
-
-                $result = $youtube->uploadVideo(
-                    $accessToken,
-                    $absolutePath,
-                    $validated['title'] ?: ($validated['message'] ? \Illuminate\Support\Str::limit($validated['message'], 80) : 'Untitled'),
-                    $validated['message'] ?? null,
-                    $privacy,
-                    $request->boolean('youtube_as_short')
-                );
-
-                $facebookPostId = $result['id'] ?? null;
-                $facebookVideoId = null;
-            } elseif ($page->provider === 'instagram') {
-                $publicUrl = Storage::disk('public')->url($mediaPath);
-                if (! str_starts_with($publicUrl, 'http')) {
-                    $publicUrl = rtrim(config('app.url'), '/').$publicUrl;
-                }
-
-                $result = $mediaType === 'video'
-                    ? $instagram->publishReel(
-                        $page->page_id,
-                        $page->access_token,
-                        $publicUrl,
-                        $validated['message'] ?? null
-                    )
-                    : $instagram->publishImage(
-                        $page->page_id,
-                        $page->access_token,
-                        $publicUrl,
-                        $validated['message'] ?? null
-                    );
-
-                $facebookPostId = $result['id'] ?? null;
-                $facebookVideoId = null;
-            } else {
-                $absolutePath = $mediaPath
-                    ? Storage::disk('public')->path($mediaPath)
-                    : null;
-
-                if ($mediaType === 'video') {
-                    $result = $facebook->publishReel(
-                        $page->page_id,
-                        $page->access_token,
-                        $absolutePath,
-                        $validated['message'] ?? null,
-                        $validated['title'] ?? null
-                    );
-                    $facebookPostId = $result['post_id'] ?? $result['id'] ?? null;
-                    $facebookVideoId = $result['video_id'] ?? null;
-                } elseif ($mediaType === 'image') {
-                    $result = $facebook->publishPhotoPost(
-                        $page->page_id,
-                        $page->access_token,
-                        $absolutePath,
-                        basename($mediaPath),
-                        $validated['message'] ?? null
-                    );
-                    $facebookPostId = $result['post_id'] ?? $result['id'] ?? null;
-                    $facebookVideoId = null;
-                } else {
-                    $result = $facebook->publishTextPost(
-                        $page->page_id,
-                        $page->access_token,
-                        (string) $validated['message']
-                    );
-                    $facebookPostId = $result['id'] ?? null;
-                    $facebookVideoId = null;
-                }
-            }
+            [$remotePostId, $remoteVideoId] = $this->publishToProvider(
+                $page,
+                $mediaType,
+                $mediaPath,
+                $validated,
+                $request,
+                $facebook,
+                $instagram,
+                $youtube
+            );
 
             $post->update([
                 'status' => 'published',
-                'facebook_post_id' => $facebookPostId,
-                'facebook_video_id' => $facebookVideoId,
+                'facebook_post_id' => $remotePostId,
+                'facebook_video_id' => $remoteVideoId,
                 'published_at' => now(),
                 'error_message' => null,
             ]);
@@ -198,29 +132,167 @@ class PostController extends Controller
                 'error_message' => $e->getMessage(),
             ]);
 
-            return redirect()
-                ->route('posts.create')
-                ->with('error', 'Publish failed: '.$e->getMessage());
+            return $this->fail($request, $providerLabel.' failed: '.$e->getMessage(), [
+                'provider' => $page->provider,
+                'provider_label' => $providerLabel,
+                'page_name' => $page->name,
+                'media_path' => $mediaPath,
+                'media_type' => $mediaType,
+                'status' => 'failed',
+            ]);
         }
 
-        $label = match ($postFormat) {
-            'short' => 'Short',
-            'reel' => 'Reel',
-            'video' => 'Video',
-            default => 'Post',
-        };
+        $payload = [
+            'success' => true,
+            'message' => $providerLabel.' posted',
+            'provider' => $page->provider,
+            'provider_label' => $providerLabel,
+            'page_name' => $page->name,
+            'media_path' => $mediaPath,
+            'media_type' => $mediaType,
+            'status' => 'published',
+            'post_id' => $post->id,
+        ];
 
-        $privacyNote = $page->provider === 'youtube'
-            ? ' (privacy: '.($validated['youtube_privacy'] ?? 'private').'; — unaudited apps may stay private)'
-            : '';
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json($payload);
+        }
 
         return redirect()
             ->route('posts.create')
-            ->with('success', $label.' published to '.$page->name.$privacyNote.'.');
+            ->with('success', $payload['message'].' to '.$page->name.'.');
+    }
+
+    /**
+     * @param  array<string, mixed>  $validated
+     * @return array{0: string, 1: ?string}
+     */
+    private function resolveMedia(Request $request, array $validated): array
+    {
+        $userPrefix = 'posts/'.$request->user()->id.'/';
+
+        if ($request->hasFile('image')) {
+            return ['image', $request->file('image')->store('posts/'.$request->user()->id, 'public')];
+        }
+
+        if ($request->hasFile('video')) {
+            return ['video', $request->file('video')->store('posts/'.$request->user()->id, 'public')];
+        }
+
+        $existingPath = $validated['media_path'] ?? null;
+        $existingType = $validated['media_type'] ?? 'none';
+
+        if ($existingPath) {
+            if (! str_starts_with($existingPath, $userPrefix) || ! Storage::disk('public')->exists($existingPath)) {
+                abort(422, 'Invalid media path.');
+            }
+
+            return [$existingType ?: 'none', $existingPath];
+        }
+
+        return ['none', null];
+    }
+
+    /**
+     * @param  array<string, mixed>  $validated
+     * @return array{0: ?string, 1: ?string}
+     */
+    private function publishToProvider(
+        SocialPage $page,
+        string $mediaType,
+        ?string $mediaPath,
+        array $validated,
+        Request $request,
+        FacebookService $facebook,
+        InstagramService $instagram,
+        YouTubeService $youtube
+    ): array {
+        if ($page->provider === 'youtube') {
+            $accessToken = $this->youtubeAccessToken($page, $youtube);
+            $absolutePath = Storage::disk('public')->path($mediaPath);
+
+            $result = $youtube->uploadVideo(
+                $accessToken,
+                $absolutePath,
+                $validated['title'] ?: ($validated['message'] ? Str::limit($validated['message'], 80) : 'Untitled'),
+                $validated['message'] ?? null,
+                $validated['youtube_privacy'] ?? 'private',
+                $request->boolean('youtube_as_short')
+            );
+
+            return [$result['id'] ?? null, null];
+        }
+
+        if ($page->provider === 'instagram') {
+            $publicUrl = Storage::disk('public')->url($mediaPath);
+            if (! str_starts_with($publicUrl, 'http')) {
+                $publicUrl = rtrim(config('app.url'), '/').$publicUrl;
+            }
+
+            $result = $mediaType === 'video'
+                ? $instagram->publishReel($page->page_id, $page->access_token, $publicUrl, $validated['message'] ?? null)
+                : $instagram->publishImage($page->page_id, $page->access_token, $publicUrl, $validated['message'] ?? null);
+
+            return [$result['id'] ?? null, null];
+        }
+
+        $absolutePath = $mediaPath ? Storage::disk('public')->path($mediaPath) : null;
+
+        if ($mediaType === 'video') {
+            $result = $facebook->publishReel(
+                $page->page_id,
+                $page->access_token,
+                $absolutePath,
+                $validated['message'] ?? null,
+                $validated['title'] ?? null
+            );
+
+            return [$result['post_id'] ?? $result['id'] ?? null, $result['video_id'] ?? null];
+        }
+
+        if ($mediaType === 'image') {
+            $result = $facebook->publishPhotoPost(
+                $page->page_id,
+                $page->access_token,
+                $absolutePath,
+                basename($mediaPath),
+                $validated['message'] ?? null
+            );
+
+            return [$result['post_id'] ?? $result['id'] ?? null, null];
+        }
+
+        $result = $facebook->publishTextPost(
+            $page->page_id,
+            $page->access_token,
+            (string) $validated['message']
+        );
+
+        return [$result['id'] ?? null, null];
+    }
+
+    /**
+     * @param  array<string, mixed>  $extra
+     */
+    private function fail(Request $request, string $message, array $extra = []): JsonResponse|RedirectResponse
+    {
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json(array_merge([
+                'success' => false,
+                'message' => $message,
+                'status' => 'failed',
+            ], $extra), 422);
+        }
+
+        return back()->withInput()->with('error', $message);
     }
 
     private function youtubeAccessToken(SocialPage $page, YouTubeService $youtube): string
     {
+        if (method_exists($youtube, 'resolveAccessToken')) {
+            return $youtube->resolveAccessToken($page);
+        }
+
         $account = $page->socialAccount;
 
         if (! $account instanceof SocialAccount) {
