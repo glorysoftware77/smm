@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Post;
 use App\Models\SocialPage;
 use App\Services\FacebookService;
+use App\Services\InstagramService;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -23,7 +24,11 @@ class InsightsController extends Controller
 
     private const CACHE_MINUTES = 10;
 
-    public function index(Request $request, FacebookService $facebook): View
+    public function index(
+        Request $request,
+        FacebookService $facebook,
+        InstagramService $instagram
+    ): View
     {
         $platform = $this->platform($request->string('platform')->toString());
         $range = $this->range($request->integer('range', self::DEFAULT_RANGE));
@@ -40,6 +45,13 @@ class InsightsController extends Controller
                 report($e);
                 $error = $e->getMessage();
             }
+        } elseif ($platform === 'instagram' && $page) {
+            try {
+                $rows = $this->instagramRows($page, $instagram, $from, $to, $request->boolean('fresh'));
+            } catch (Throwable $e) {
+                report($e);
+                $error = $this->instagramError($e);
+            }
         } else {
             $rows = $this->localRows($request, $platform, $from, $to);
         }
@@ -51,7 +63,11 @@ class InsightsController extends Controller
             'rangeFrom' => $from,
             'rangeTo' => $to,
             'pageName' => $page?->name,
-            'pageStats' => $platform === 'facebook' && $page ? $this->pageStats($page, $facebook, $from, $to) : null,
+            'pageStats' => match ($platform) {
+                'facebook' => $page ? $this->facebookPageStats($page, $facebook, $from, $to) : null,
+                'instagram' => $page ? $this->instagramPageStats($page, $instagram) : null,
+                default => null,
+            },
             'rows' => $rows,
             'summary' => $this->buildSummary($rows),
             'error' => $error,
@@ -140,6 +156,64 @@ class InsightsController extends Controller
     }
 
     /**
+     * Live Instagram media and insights, including content not posted here.
+     */
+    private function instagramRows(
+        SocialPage $page,
+        InstagramService $instagram,
+        Carbon $from,
+        Carbon $to,
+        bool $fresh
+    ): Collection {
+        $key = $this->cacheKey($page, $from, $to);
+
+        if ($fresh) {
+            Cache::forget($key);
+        }
+
+        $content = Cache::remember($key, now()->addMinutes(self::CACHE_MINUTES), function () use ($page, $instagram, $from, $to) {
+            return $instagram->getAccountContent(
+                $page->page_id,
+                $page->access_token,
+                $from->timestamp,
+                $to->timestamp,
+            );
+        });
+
+        $appMediaIds = Post::query()
+            ->where('social_page_id', $page->id)
+            ->pluck('facebook_post_id')
+            ->filter()
+            ->map(fn ($id) => (string) $id)
+            ->all();
+
+        return collect($content)
+            ->map(function (array $item) use ($appMediaIds) {
+                $insights = $item['insights'] ?? [];
+                $productType = $item['media_product_type'] ?? '';
+                $mediaType = $item['media_type'] ?? 'MEDIA';
+
+                return [
+                    'title' => $this->rowTitle($item['caption'] ?? null),
+                    'type' => $productType === 'REELS' ? 'REEL' : $mediaType,
+                    'permalink' => $item['permalink'] ?? null,
+                    'thumbnail' => $item['thumbnail_url'] ?? null,
+                    'published_at' => ! empty($item['timestamp']) ? Carbon::parse($item['timestamp']) : null,
+                    'views' => $this->pick($insights, ['views']),
+                    'reach' => $this->pick($insights, ['reach']),
+                    'from_followers' => null,
+                    'from_non_followers' => null,
+                    'reactions' => $this->pick($insights, ['likes']) ?? ($item['like_count'] ?? 0),
+                    'comments' => $this->pick($insights, ['comments']) ?? ($item['comments_count'] ?? 0),
+                    'shares' => $this->pick($insights, ['shares']),
+                    'from_app' => in_array((string) ($item['id'] ?? ''), $appMediaIds, true),
+                ];
+            })
+            ->sortByDesc(fn (array $row) => $row['published_at']?->timestamp ?? 0)
+            ->values();
+    }
+
+    /**
      * Fallback for platforms without a content API wired up yet.
      */
     private function localRows(Request $request, string $platform, Carbon $from, Carbon $to): Collection
@@ -173,7 +247,7 @@ class InsightsController extends Controller
     /**
      * @return array<string, mixed>
      */
-    private function pageStats(SocialPage $page, FacebookService $facebook, Carbon $from, Carbon $to): array
+    private function facebookPageStats(SocialPage $page, FacebookService $facebook, Carbon $from, Carbon $to): array
     {
         $stats = ['followers' => null, 'new_follows' => null, 'page_views' => null];
 
@@ -191,6 +265,23 @@ class InsightsController extends Controller
                 ?? $insights['page_follows']
                 ?? null;
             $stats['page_views'] = $insights['page_views_total'] ?? $insights['page_media_view'] ?? null;
+        } catch (Throwable $e) {
+            report($e);
+        }
+
+        return $stats;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function instagramPageStats(SocialPage $page, InstagramService $instagram): array
+    {
+        $stats = ['followers' => null, 'new_follows' => null, 'page_views' => null];
+
+        try {
+            $summary = $instagram->getAccountSummary($page->page_id, $page->access_token);
+            $stats['followers'] = $summary['followers_count'] ?? null;
         } catch (Throwable $e) {
             report($e);
         }
@@ -231,7 +322,20 @@ class InsightsController extends Controller
 
     private function cacheKey(SocialPage $page, Carbon $from, Carbon $to): string
     {
-        return sprintf('insights:fb:%d:%s:%s', $page->id, $from->toDateString(), $to->toDateString());
+        return sprintf('insights:%s:%d:%s:%s', $page->provider, $page->id, $from->toDateString(), $to->toDateString());
+    }
+
+    private function instagramError(Throwable $error): string
+    {
+        $message = $error->getMessage();
+
+        if (str_contains($message, 'permission')
+            || str_contains($message, 'OAuth')
+            || str_contains($message, 'code\":190')) {
+            return 'Instagram Insights permission is missing. Reconnect Instagram from Dashboard, then return here.';
+        }
+
+        return $message;
     }
 
     /**

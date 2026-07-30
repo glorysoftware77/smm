@@ -2,7 +2,9 @@
 
 namespace App\Services;
 
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use RuntimeException;
 
@@ -22,6 +24,7 @@ class InstagramService
                 'instagram_business_basic',
                 'instagram_business_content_publish',
                 'instagram_business_manage_comments',
+                'instagram_business_manage_insights',
             ]),
         ]);
 
@@ -122,6 +125,204 @@ class InstagramService
         $this->waitForContainer($creationId, $accessToken);
 
         return $this->publishContainer($igUserId, $accessToken, $creationId);
+    }
+
+    /**
+     * Returns all media published in the requested window with live insights.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function getAccountContent(
+        string $igUserId,
+        string $accessToken,
+        int $since,
+        int $until,
+        int $maxItems = 100
+    ): array {
+        $media = $this->getMedia($igUserId, $accessToken, $since, $until, $maxItems);
+        $content = [];
+
+        foreach ($media as $item) {
+            $mediaId = (string) ($item['id'] ?? '');
+
+            if ($mediaId === '') {
+                continue;
+            }
+
+            $type = strtoupper((string) ($item['media_type'] ?? ''));
+            $metrics = $this->supportedMediaMetrics($igUserId, $mediaId, $type, $accessToken);
+            $insights = $this->getMediaInsights($mediaId, $accessToken, $metrics);
+
+            $content[] = [
+                'id' => $mediaId,
+                'caption' => $item['caption'] ?? null,
+                'media_type' => $type ?: 'MEDIA',
+                'media_product_type' => strtoupper((string) ($item['media_product_type'] ?? '')),
+                'media_url' => $item['media_url'] ?? null,
+                'thumbnail_url' => $item['thumbnail_url'] ?? $item['media_url'] ?? null,
+                'permalink' => $item['permalink'] ?? null,
+                'timestamp' => $item['timestamp'] ?? null,
+                'like_count' => (int) ($item['like_count'] ?? 0),
+                'comments_count' => (int) ($item['comments_count'] ?? 0),
+                'insights' => $insights,
+            ];
+        }
+
+        return $content;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getAccountSummary(string $igUserId, string $accessToken): array
+    {
+        $response = Http::get($this->graphUrl('/'.$igUserId), [
+            'fields' => 'username,followers_count,follows_count,media_count,profile_picture_url',
+            'access_token' => $accessToken,
+        ]);
+
+        if (! $response->successful()) {
+            throw new RuntimeException('Failed to fetch Instagram account summary: '.$response->body());
+        }
+
+        return $response->json() ?? [];
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function getMedia(string $igUserId, string $accessToken, int $since, int $until, int $maxItems): array
+    {
+        $response = Http::get($this->graphUrl('/'.$igUserId.'/media'), [
+            'fields' => 'id,caption,media_type,media_product_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count',
+            'limit' => 50,
+            'access_token' => $accessToken,
+        ]);
+
+        if (! $response->successful()) {
+            throw new RuntimeException('Failed to fetch Instagram media: '.$response->body());
+        }
+
+        $items = [];
+
+        while (true) {
+            foreach ($response->json('data', []) as $item) {
+                $timestamp = isset($item['timestamp']) ? strtotime($item['timestamp']) : false;
+
+                if ($timestamp !== false && $timestamp >= $since && $timestamp <= $until) {
+                    $items[] = $item;
+                }
+
+                if ($timestamp !== false && $timestamp < $since) {
+                    return array_slice($items, 0, $maxItems);
+                }
+
+                if (count($items) >= $maxItems) {
+                    return $items;
+                }
+            }
+
+            $next = $response->json('paging.next');
+
+            if (! $next) {
+                break;
+            }
+
+            $response = Http::get($next);
+
+            if (! $response->successful()) {
+                break;
+            }
+        }
+
+        return $items;
+    }
+
+    /**
+     * @param  array<int, string>  $metrics
+     * @return array<string, int|float>
+     */
+    private function getMediaInsights(string $mediaId, string $accessToken, array $metrics): array
+    {
+        if ($metrics === []) {
+            return [];
+        }
+
+        $response = Http::get($this->graphUrl('/'.$mediaId.'/insights'), [
+            'metric' => implode(',', $metrics),
+            'period' => 'lifetime',
+            'access_token' => $accessToken,
+        ]);
+
+        if (! $response->successful()) {
+            Log::warning('Instagram media insights failed', [
+                'media_id' => $mediaId,
+                'body' => $response->body(),
+            ]);
+
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($response->json('data', []) as $row) {
+            $name = $row['name'] ?? null;
+            $value = data_get($row, 'values.0.value') ?? data_get($row, 'total_value.value');
+
+            if ($name && is_numeric($value)) {
+                $normalized[$name] = $value;
+            }
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * Probe once per account/media type because Meta supports different
+     * metrics for feed posts, carousels and Reels.
+     *
+     * @return array<int, string>
+     */
+    private function supportedMediaMetrics(
+        string $igUserId,
+        string $mediaId,
+        string $mediaType,
+        string $accessToken
+    ): array {
+        return Cache::remember(
+            'instagram:media-metrics:'.self::GRAPH_VERSION.':'.$igUserId.':'.$mediaType,
+            now()->addHours(12),
+            function () use ($mediaId, $accessToken) {
+                $candidates = [
+                    'views',
+                    'reach',
+                    'likes',
+                    'comments',
+                    'shares',
+                    'saved',
+                    'total_interactions',
+                    'follows',
+                    'profile_visits',
+                    'watch_time',
+                    'avg_watch_time',
+                ];
+                $supported = [];
+
+                foreach ($candidates as $metric) {
+                    $response = Http::get($this->graphUrl('/'.$mediaId.'/insights'), [
+                        'metric' => $metric,
+                        'period' => 'lifetime',
+                        'access_token' => $accessToken,
+                    ]);
+
+                    if ($response->successful()) {
+                        $supported[] = $metric;
+                    }
+                }
+
+                return $supported;
+            }
+        );
     }
 
     public function generateState(): string

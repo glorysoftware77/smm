@@ -45,16 +45,25 @@
     <div class="py-6">
         <div class="mx-auto max-w-7xl space-y-5 px-4 sm:px-6 lg:px-8">
             @if ($error)
-                <div class="rounded-md bg-red-50 px-4 py-3 text-sm text-red-800">{{ $error }}</div>
+                <div class="rounded-md bg-red-50 px-4 py-3 text-sm text-red-800">
+                    {{ $error }}
+                    @if ($platform === 'instagram')
+                        <a href="{{ route('dashboard') }}" class="ml-1 font-medium underline">Reconnect Instagram</a>
+                    @endif
+                </div>
             @endif
 
             <div class="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
                 @foreach ([
                     'Views' => $summary['views'],
                     'Reach' => $summary['reach'],
-                    'Followers views' => $summary['from_followers'],
-                    'Non-followers' => $summary['from_non_followers'],
-                    'Reactions' => $summary['reactions'],
+                    $platform === 'facebook' ? 'Followers views' : 'Posts' => $platform === 'facebook'
+                        ? $summary['from_followers']
+                        : $summary['total'],
+                    $platform === 'facebook' ? 'Non-followers' : 'From SMM' => $platform === 'facebook'
+                        ? $summary['from_non_followers']
+                        : $summary['from_app'],
+                    $platform === 'instagram' ? 'Likes' : 'Reactions' => $summary['reactions'],
                     'Comments' => $summary['comments'],
                     'Shares' => $summary['shares'],
                 ] as $label => $value)
@@ -67,15 +76,17 @@
 
             @if ($pageStats)
                 <div class="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm">
-                    <span class="text-gray-500">Page followers:
+                    <span class="text-gray-500">{{ $platform === 'instagram' ? 'Instagram followers' : 'Page followers' }}:
                         <strong class="text-gray-900">{{ $fmt($pageStats['followers']) }}</strong>
                     </span>
-                    <span class="text-gray-500">New follows ({{ $range }}d):
-                        <strong class="text-gray-900">{{ $fmt($pageStats['new_follows']) }}</strong>
-                    </span>
-                    <span class="text-gray-500">Page views ({{ $range }}d):
-                        <strong class="text-gray-900">{{ $fmt($pageStats['page_views']) }}</strong>
-                    </span>
+                    @if ($platform === 'facebook')
+                        <span class="text-gray-500">New follows ({{ $range }}d):
+                            <strong class="text-gray-900">{{ $fmt($pageStats['new_follows']) }}</strong>
+                        </span>
+                        <span class="text-gray-500">Page views ({{ $range }}d):
+                            <strong class="text-gray-900">{{ $fmt($pageStats['page_views']) }}</strong>
+                        </span>
+                    @endif
                     <span class="text-gray-400">
                         {{ $summary['total'] }} posts · {{ $summary['from_app'] }} published from this app
                     </span>
@@ -94,9 +105,11 @@
                                 <th class="px-4 py-2.5 text-left font-medium">Post</th>
                                 <th class="px-3 py-2.5 text-right font-medium">Views</th>
                                 <th class="px-3 py-2.5 text-right font-medium">Reach</th>
-                                <th class="px-3 py-2.5 text-right font-medium">Followers</th>
-                                <th class="px-3 py-2.5 text-right font-medium">Non-foll.</th>
-                                <th class="px-3 py-2.5 text-right font-medium">Reactions</th>
+                                @if ($platform === 'facebook')
+                                    <th class="px-3 py-2.5 text-right font-medium">Followers</th>
+                                    <th class="px-3 py-2.5 text-right font-medium">Non-foll.</th>
+                                @endif
+                                <th class="px-3 py-2.5 text-right font-medium">{{ $platform === 'instagram' ? 'Likes' : 'Reactions' }}</th>
                                 <th class="px-3 py-2.5 text-right font-medium">Comments</th>
                                 <th class="px-3 py-2.5 text-right font-medium">Shares</th>
                                 <th class="px-3 py-2.5 text-right font-medium">Published</th>
@@ -133,8 +146,10 @@
                                     </td>
                                     <td class="px-3 py-3 text-right font-semibold text-gray-900">{{ $fmt($row['views']) }}</td>
                                     <td class="px-3 py-3 text-right text-gray-700">{{ $fmt($row['reach']) }}</td>
-                                    <td class="px-3 py-3 text-right text-gray-700">{{ $fmt($row['from_followers']) }}</td>
-                                    <td class="px-3 py-3 text-right text-gray-700">{{ $fmt($row['from_non_followers']) }}</td>
+                                    @if ($platform === 'facebook')
+                                        <td class="px-3 py-3 text-right text-gray-700">{{ $fmt($row['from_followers']) }}</td>
+                                        <td class="px-3 py-3 text-right text-gray-700">{{ $fmt($row['from_non_followers']) }}</td>
+                                    @endif
                                     <td class="px-3 py-3 text-right text-gray-700">{{ $fmt($row['reactions']) }}</td>
                                     <td class="px-3 py-3 text-right text-gray-700">{{ $fmt($row['comments']) }}</td>
                                     <td class="px-3 py-3 text-right text-gray-700">{{ $fmt($row['shares']) }}</td>
@@ -174,7 +189,8 @@
             @endif
 
             <p class="text-xs text-gray-400">
-                Pulled live from your Facebook Page, so posts made outside this app are included. Cached for 10 minutes; hit Refresh for the latest.
+                Pulled live from your {{ $platform === 'facebook' ? 'Facebook Page' : 'Instagram account' }}, including posts made outside this app.
+                Cached for 10 minutes; hit Refresh for the latest.
             </p>
         </div>
     </div>
