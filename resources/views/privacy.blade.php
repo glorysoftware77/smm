@@ -1,15 +1,16 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
     <title>Privacy Policy — Glory SMM</title>
     <style>
-        body { font-family: Georgia, serif; max-width: 720px; margin: 40px auto; padding: 0 20px; line-height: 1.6; color: #222; }
-        h1 { font-size: 1.8rem; margin-bottom: 0.25rem; }
-        h2 { font-size: 1.2rem; margin-top: 1.75rem; }
-        .muted { color: #666; font-size: 0.9rem; margin-bottom: 1.5rem; }
-        a { color: #1d4ed8; }
+        body { font-family: Georgia, serif; max-width: 720px; margin: 40px auto; padding: 0 20px; line-height: 1.6; color: #e4e4e7; background: #09090b; }
+        h1 { font-size: 1.8rem; margin-bottom: 0.25rem; color: #fafafa; }
+        h2 { font-size: 1.2rem; margin-top: 1.75rem; color: #f4f4f5; }
+        .muted { color: #a1a1aa; font-size: 0.9rem; margin-bottom: 1.5rem; }
+        a { color: #818cf8; }
         ul, ol { padding-left: 1.25rem; }
     </style>
 </head>

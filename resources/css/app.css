@@ -1,3 +1,35 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+    html {
+        color-scheme: dark;
+    }
+
+    body {
+        @apply bg-zinc-950 text-zinc-100 antialiased;
+    }
+
+    input[type='text'],
+    input[type='email'],
+    input[type='password'],
+    input[type='number'],
+    input[type='search'],
+    input[type='tel'],
+    input[type='url'],
+    input[type='file'],
+    textarea,
+    select {
+        @apply bg-zinc-900 text-zinc-100 border-zinc-600 placeholder:text-zinc-500;
+    }
+
+    input[type='file']::file-selector-button {
+        @apply mr-3 rounded border-0 bg-zinc-800 px-3 py-1.5 text-sm font-medium text-zinc-200;
+    }
+
+    input[type='checkbox'],
+    input[type='radio'] {
+        @apply border-zinc-600 bg-zinc-900 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-zinc-950;
+    }
+}

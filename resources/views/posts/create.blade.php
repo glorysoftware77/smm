@@ -15,19 +15,19 @@
 
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 leading-tight">
+        <h2 class="font-semibold text-xl text-zinc-100 leading-tight">
             {{ __('Create Post') }}
         </h2>
     </x-slot>
 
     <div class="py-12">
         <div class="max-w-3xl mx-auto sm:px-6 lg:px-8 space-y-6">
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                <div class="p-6 text-gray-900">
+            <div class="bg-zinc-900 border border-zinc-800 overflow-hidden shadow-sm sm:rounded-lg">
+                <div class="p-6 text-zinc-100">
                     @if ($pages->isEmpty())
-                        <p class="text-sm text-gray-600">
+                        <p class="text-sm text-zinc-300">
                             Connect Facebook, Instagram, YouTube, or TikTok first from the
-                            <a href="{{ route('dashboard') }}" class="text-indigo-600 underline">Dashboard</a>.
+                            <a href="{{ route('dashboard') }}" class="text-indigo-400 underline">Dashboard</a>.
                         </p>
                     @else
                         <div
@@ -41,24 +41,24 @@
                             <form @submit.prevent="publishAll" enctype="multipart/form-data" class="space-y-6">
                                 <div>
                                     <x-input-label :value="__('Publish to')" />
-                                    <div class="mt-2 space-y-2 rounded-md border border-gray-200 p-3">
+                                    <div class="mt-2 space-y-2 rounded-md border border-zinc-700 p-3">
                                         <template x-for="page in pages" :key="page.id">
-                                            <label class="flex items-center gap-3 text-sm text-gray-800">
+                                            <label class="flex items-center gap-3 text-sm text-zinc-100">
                                                 <input type="checkbox"
-                                                       class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500"
+                                                       class="rounded border-zinc-600 text-indigo-400 shadow-sm focus:ring-indigo-400"
                                                        :value="page.id"
                                                        x-model="selected">
                                                 <span>
                                                     <span class="font-medium" x-text="page.label"></span>
-                                                    <span class="text-gray-500"> — <span x-text="page.name"></span></span>
+                                                    <span class="text-zinc-400"> — <span x-text="page.name"></span></span>
                                                 </span>
                                             </label>
                                         </template>
                                     </div>
-                                    <p class="mt-1 text-xs text-gray-500">
+                                    <p class="mt-1 text-xs text-zinc-400">
                                         Select one or more. FB videos → Reels. IG needs image/video. YouTube & TikTok need video.
                                     </p>
-                                    <p x-show="error && !statuses.length" class="mt-2 text-sm text-red-600" x-text="error"></p>
+                                    <p x-show="error && !statuses.length" class="mt-2 text-sm text-red-400" x-text="error"></p>
                                 </div>
 
                                 <div>
@@ -69,59 +69,59 @@
                                 <div>
                                     <x-input-label for="message" :value="__('Message / Caption / Description')" />
                                     <textarea id="message" name="message" rows="5" x-model="message"
-                                              class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"
+                                              class="mt-1 block w-full border-zinc-600 focus:border-indigo-400 focus:ring-indigo-400 rounded-md shadow-sm"
                                               placeholder="Write your post..."></textarea>
                                 </div>
 
                                 <div>
                                     <x-input-label for="image" :value="__('Image (optional)')" />
                                     <input id="image" name="image" type="file" accept="image/jpeg,image/png,image/gif,image/webp"
-                                           class="mt-1 block w-full text-sm text-gray-700"
+                                           class="mt-1 block w-full text-sm text-zinc-200"
                                            @change="imageFile = $event.target.files[0] || null">
-                                    <p class="mt-1 text-xs text-gray-500">JPG, PNG, GIF, WebP — max 10MB (not used for YouTube / TikTok)</p>
+                                    <p class="mt-1 text-xs text-zinc-400">JPG, PNG, GIF, WebP — max 10MB (not used for YouTube / TikTok)</p>
                                 </div>
 
                                 <div>
                                     <x-input-label for="video" :value="__('Video (optional)')" />
                                     <input id="video" name="video" type="file" accept="video/mp4,video/quicktime,video/x-msvideo"
-                                           class="mt-1 block w-full text-sm text-gray-700"
+                                           class="mt-1 block w-full text-sm text-zinc-200"
                                            @change="videoFile = $event.target.files[0] || null">
-                                    <p class="mt-1 text-xs text-gray-500">MP4 / MOV — max 100MB. Shorts tip: 9:16, under 60s.</p>
+                                    <p class="mt-1 text-xs text-zinc-400">MP4 / MOV — max 100MB. Shorts tip: 9:16, under 60s.</p>
                                 </div>
 
-                                <div class="rounded-md border border-gray-200 p-4 space-y-3"
+                                <div class="rounded-md border border-zinc-700 p-4 space-y-3"
                                      x-show="selectedProviders.includes('youtube')" x-cloak>
-                                    <div class="text-sm font-medium text-gray-800">YouTube options</div>
+                                    <div class="text-sm font-medium text-zinc-100">YouTube options</div>
                                     <div>
                                         <x-input-label for="youtube_privacy" :value="__('Privacy')" />
                                         <select id="youtube_privacy" x-model="youtubePrivacy"
-                                                class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm">
+                                                class="mt-1 block w-full border-zinc-600 focus:border-indigo-400 focus:ring-indigo-400 rounded-md shadow-sm">
                                             <option value="private">Private</option>
                                             <option value="unlisted">Unlisted</option>
                                             <option value="public">Public</option>
                                         </select>
                                     </div>
-                                    <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+                                    <label class="inline-flex items-center gap-2 text-sm text-zinc-200">
                                         <input type="checkbox" x-model="youtubeAsShort"
-                                               class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500">
+                                               class="rounded border-zinc-600 text-indigo-400 shadow-sm focus:ring-indigo-400">
                                         Publish as YouTube Short (adds #Shorts to title)
                                     </label>
                                 </div>
 
-                                <div class="rounded-md border border-gray-200 p-4 space-y-3"
+                                <div class="rounded-md border border-zinc-700 p-4 space-y-3"
                                      x-show="selectedProviders.includes('tiktok')" x-cloak>
-                                    <div class="text-sm font-medium text-gray-800">TikTok options</div>
+                                    <div class="text-sm font-medium text-zinc-100">TikTok options</div>
                                     <div>
                                         <x-input-label for="tiktok_privacy" :value="__('Privacy')" />
                                         <select id="tiktok_privacy" x-model="tiktokPrivacy"
-                                                class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm">
+                                                class="mt-1 block w-full border-zinc-600 focus:border-indigo-400 focus:ring-indigo-400 rounded-md shadow-sm">
                                             <option value="SELF_ONLY">Private (SELF_ONLY) — required until audit</option>
                                             <option value="PUBLIC_TO_EVERYONE">Public</option>
                                             <option value="MUTUAL_FOLLOW_FRIENDS">Friends</option>
                                             <option value="FOLLOWER_OF_CREATOR">Followers</option>
                                         </select>
                                     </div>
-                                    <p class="text-xs text-gray-500">Unaudited apps must use SELF_ONLY. Keep the TikTok account private while testing.</p>
+                                    <p class="text-xs text-zinc-400">Unaudited apps must use SELF_ONLY. Keep the TikTok account private while testing.</p>
                                 </div>
 
                                 <div class="flex items-center gap-3">
@@ -132,29 +132,29 @@
                                 </div>
                             </form>
 
-                            <div x-show="statuses.length" x-cloak class="rounded-md border border-gray-200 bg-gray-50 p-4 space-y-3">
-                                <div class="text-sm font-medium text-gray-900">Publish status</div>
+                            <div x-show="statuses.length" x-cloak class="rounded-md border border-zinc-700 bg-zinc-800/50 p-4 space-y-3">
+                                <div class="text-sm font-medium text-zinc-100">Publish status</div>
                                 <ul class="space-y-2">
                                     <template x-for="item in statuses" :key="item.id">
                                         <li class="flex items-start justify-between gap-3 text-sm">
                                             <div>
-                                                <span class="font-medium text-gray-900" x-text="item.label"></span>
-                                                <span class="text-gray-500"> — <span x-text="item.name"></span></span>
-                                                <p class="text-xs text-red-600 mt-0.5" x-show="item.error" x-text="item.error"></p>
+                                                <span class="font-medium text-zinc-100" x-text="item.label"></span>
+                                                <span class="text-zinc-400"> — <span x-text="item.name"></span></span>
+                                                <p class="text-xs text-red-400 mt-0.5" x-show="item.error" x-text="item.error"></p>
                                             </div>
                                             <span class="whitespace-nowrap text-xs font-semibold uppercase tracking-wide"
                                                   :class="{
-                                                      'text-gray-400': item.status === 'waiting',
-                                                      'text-amber-600': item.status === 'progress',
-                                                      'text-green-700': item.status === 'published',
-                                                      'text-red-700': item.status === 'failed',
+                                                      'text-zinc-500': item.status === 'waiting',
+                                                      'text-amber-400': item.status === 'progress',
+                                                      'text-green-300': item.status === 'published',
+                                                      'text-red-300': item.status === 'failed',
                                                   }"
                                                   x-text="statusText(item)"></span>
                                         </li>
                                     </template>
                                 </ul>
-                                <p class="text-sm text-green-700" x-show="done && !hasFailures" x-cloak>All selected platforms finished.</p>
-                                <p class="text-sm text-amber-700" x-show="done && hasFailures" x-cloak>Finished with some failures — see above.</p>
+                                <p class="text-sm text-green-300" x-show="done && !hasFailures" x-cloak>All selected platforms finished.</p>
+                                <p class="text-sm text-amber-300" x-show="done && hasFailures" x-cloak>Finished with some failures — see above.</p>
                             </div>
                         </div>
                     @endif
