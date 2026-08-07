@@ -27,7 +27,7 @@
                     @if ($pages->isEmpty())
                         <p class="text-sm text-zinc-300">
                             Connect Facebook, Instagram, YouTube, or TikTok first from the
-                            <a href="{{ route('dashboard') }}" class="text-indigo-400 underline">Dashboard</a>.
+                            <a href="{{ route('dashboard') }}" class="text-glory-400 underline">Dashboard</a>.
                         </p>
                     @else
                         <div
@@ -45,7 +45,7 @@
                                         <template x-for="page in pages" :key="page.id">
                                             <label class="flex items-center gap-3 text-sm text-zinc-100">
                                                 <input type="checkbox"
-                                                       class="rounded border-zinc-600 text-indigo-400 shadow-sm focus:ring-indigo-400"
+                                                       class="rounded border-zinc-600 text-glory-400 shadow-sm focus:ring-glory-400"
                                                        :value="page.id"
                                                        x-model="selected">
                                                 <span>
@@ -69,7 +69,7 @@
                                 <div>
                                     <x-input-label for="message" :value="__('Message / Caption / Description')" />
                                     <textarea id="message" name="message" rows="5" x-model="message"
-                                              class="mt-1 block w-full border-zinc-600 focus:border-indigo-400 focus:ring-indigo-400 rounded-md shadow-sm"
+                                              class="mt-1 block w-full border-zinc-600 focus:border-glory-400 focus:ring-glory-400 rounded-md shadow-sm"
                                               placeholder="Write your post..."></textarea>
                                 </div>
 
@@ -95,7 +95,7 @@
                                     <div>
                                         <x-input-label for="youtube_privacy" :value="__('Privacy')" />
                                         <select id="youtube_privacy" x-model="youtubePrivacy"
-                                                class="mt-1 block w-full border-zinc-600 focus:border-indigo-400 focus:ring-indigo-400 rounded-md shadow-sm">
+                                                class="mt-1 block w-full border-zinc-600 focus:border-glory-400 focus:ring-glory-400 rounded-md shadow-sm">
                                             <option value="private">Private</option>
                                             <option value="unlisted">Unlisted</option>
                                             <option value="public">Public</option>
@@ -103,7 +103,7 @@
                                     </div>
                                     <label class="inline-flex items-center gap-2 text-sm text-zinc-200">
                                         <input type="checkbox" x-model="youtubeAsShort"
-                                               class="rounded border-zinc-600 text-indigo-400 shadow-sm focus:ring-indigo-400">
+                                               class="rounded border-zinc-600 text-glory-400 shadow-sm focus:ring-glory-400">
                                         Publish as YouTube Short (adds #Shorts to title)
                                     </label>
                                 </div>
@@ -114,7 +114,7 @@
                                     <div>
                                         <x-input-label for="tiktok_privacy" :value="__('Privacy')" />
                                         <select id="tiktok_privacy" x-model="tiktokPrivacy"
-                                                class="mt-1 block w-full border-zinc-600 focus:border-indigo-400 focus:ring-indigo-400 rounded-md shadow-sm">
+                                                class="mt-1 block w-full border-zinc-600 focus:border-glory-400 focus:ring-glory-400 rounded-md shadow-sm">
                                             <option value="SELF_ONLY">Private (SELF_ONLY) — required until audit</option>
                                             <option value="PUBLIC_TO_EVERYONE">Public</option>
                                             <option value="MUTUAL_FOLLOW_FRIENDS">Friends</option>

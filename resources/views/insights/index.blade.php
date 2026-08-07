@@ -18,14 +18,14 @@
                 <div class="inline-flex rounded-md border border-zinc-600 bg-zinc-900 p-0.5">
                     @foreach ($tabs as $key => $label)
                         <a href="{{ route('insights.index', ['platform' => $key, 'range' => $range]) }}"
-                           class="rounded px-3 py-1.5 text-sm {{ $platform === $key ? 'bg-indigo-600 text-white' : 'text-zinc-300 hover:text-zinc-100' }}">
+                           class="rounded px-3 py-1.5 text-sm {{ $platform === $key ? 'bg-glory-600 text-white' : 'text-zinc-300 hover:text-zinc-100' }}">
                             {{ $label }}
                         </a>
                     @endforeach
                 </div>
 
                 <select onchange="window.location.href=this.value"
-                        class="rounded-md border-zinc-600 text-sm shadow-sm focus:border-indigo-400 focus:ring-indigo-400">
+                        class="rounded-md border-zinc-600 text-sm shadow-sm focus:border-glory-400 focus:ring-glory-400">
                     @foreach ($ranges as $days)
                         <option value="{{ route('insights.index', ['platform' => $platform, 'range' => $days]) }}"
                                 @selected($range === $days)>
@@ -35,7 +35,7 @@
                 </select>
 
                 <a href="{{ route('insights.index', ['platform' => $platform, 'range' => $range, 'fresh' => 1]) }}"
-                   class="rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+                   class="rounded-md bg-glory-600 px-3 py-2 text-sm font-medium text-white hover:bg-glory-700">
                     Refresh
                 </a>
             </div>
@@ -148,10 +148,10 @@
                                                     <span class="uppercase">{{ $row['type'] }}</span>
                                                     @if ($row['permalink'])
                                                         <a href="{{ $row['permalink'] }}" target="_blank" rel="noopener"
-                                                           class="text-indigo-400 hover:underline">View</a>
+                                                           class="text-glory-400 hover:underline">View</a>
                                                     @endif
                                                     @if ($row['from_app'])
-                                                        <span class="rounded bg-indigo-950/40 px-1.5 py-0.5 text-[10px] font-medium text-indigo-300">SMM</span>
+                                                        <span class="rounded bg-glory-950/40 px-1.5 py-0.5 text-[10px] font-medium text-glory-300">SMM</span>
                                                     @endif
                                                 </div>
                                             </div>
