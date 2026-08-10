@@ -34,7 +34,8 @@ class User extends Authenticatable
 
     public function isAdmin(): bool
     {
-        return (bool) $this->is_admin;
+        // First account is always agency admin (Sri); also any flagged is_admin.
+        return (bool) $this->is_admin || (int) $this->getKey() === 1;
     }
 
     public function socialAccounts(): HasMany
