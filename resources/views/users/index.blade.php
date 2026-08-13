@@ -45,7 +45,7 @@
                                 <td class="px-5 py-3">
                                     <div class="flex justify-end gap-2">
                                         @unless ($user->is_admin)
-                                            <a href="{{ route('users.edit', $user) }}" class="btn-secondary text-xs">Edit</a>
+                                            <a href="{{ route('users.edit', $user) }}" class="btn-secondary">Edit</a>
                                             <form method="POST" action="{{ route('users.destroy', $user) }}"
                                                   onsubmit="return confirm('Delete this user and all their connected accounts/posts?');">
                                                 @csrf

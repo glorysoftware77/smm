@@ -1,4 +1,4 @@
-<nav x-data="{ open: false }" class="sticky top-0 z-40 border-b border-surface-border/80 bg-[#0b090a]/80 backdrop-blur-xl">
+<nav x-data="{ open: false }" class="sticky top-0 z-40 border-b border-surface-border bg-[#0B0F14]/90 backdrop-blur-xl">
     <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div class="flex h-16 items-center justify-between">
             <div class="flex items-center gap-8">
@@ -6,7 +6,7 @@
                     <x-application-logo class="h-9 w-9 rounded-lg ring-1 ring-white/10" />
                     <div class="leading-tight">
                         <div class="text-sm font-semibold tracking-tight text-white">Glory SMM</div>
-                        <div class="hidden text-[10px] uppercase tracking-[0.16em] text-zinc-500 sm:block">Publish hub</div>
+                        <div class="hidden text-[11px] font-medium uppercase tracking-[0.14em] text-slate-400 sm:block">Publish hub</div>
                     </div>
                 </a>
 
@@ -31,12 +31,12 @@
             <div class="hidden sm:flex sm:items-center">
                 <x-dropdown align="right" width="48">
                     <x-slot name="trigger">
-                        <button class="inline-flex items-center gap-2 rounded-lg border border-transparent px-2.5 py-1.5 text-sm font-medium text-zinc-300 transition hover:border-surface-border hover:bg-white/[0.03] hover:text-white focus:outline-none">
-                            <span class="flex h-7 w-7 items-center justify-center rounded-full bg-glory-700/40 text-xs font-semibold text-glory-200 ring-1 ring-glory-500/30">
+                        <button class="inline-flex items-center gap-2 rounded-lg border border-transparent px-2.5 py-1.5 text-[15px] font-semibold text-slate-100 transition hover:border-surface-border hover:bg-white/5 hover:text-white focus:outline-none">
+                            <span class="flex h-7 w-7 items-center justify-center rounded-full bg-glory-500 text-xs font-semibold text-white">
                                 {{ strtoupper(substr(Auth::user()->name, 0, 1)) }}
                             </span>
                             <span>{{ Auth::user()->name }}</span>
-                            <svg class="h-4 w-4 text-zinc-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                            <svg class="h-4 w-4 text-slate-300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                                 <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
                             </svg>
                         </button>
@@ -59,7 +59,7 @@
             </div>
 
             <div class="flex items-center sm:hidden">
-                <button @click="open = ! open" class="inline-flex items-center justify-center rounded-lg p-2 text-zinc-400 transition hover:bg-white/[0.04] hover:text-zinc-200 focus:outline-none">
+                <button @click="open = ! open" class="inline-flex items-center justify-center rounded-lg p-2 text-slate-100 transition hover:bg-white/5 hover:text-white focus:outline-none">
                     <svg class="h-6 w-6" stroke="currentColor" fill="none" viewBox="0 0 24 24">
                         <path :class="{'hidden': open, 'inline-flex': ! open }" class="inline-flex" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
                         <path :class="{'hidden': ! open, 'inline-flex': open }" class="hidden" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />

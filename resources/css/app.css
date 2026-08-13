@@ -8,11 +8,7 @@
     }
 
     body {
-        @apply bg-[#0b090a] text-zinc-100 antialiased;
-        background-image:
-            radial-gradient(ellipse 80% 50% at 50% -20%, rgba(158, 61, 85, 0.22), transparent),
-            radial-gradient(ellipse 40% 30% at 100% 0%, rgba(158, 61, 85, 0.08), transparent);
-        background-attachment: fixed;
+        @apply bg-[#0B0F14] text-slate-100 antialiased;
     }
 
     input[type='text'],
@@ -25,30 +21,30 @@
     input[type='file'],
     textarea,
     select {
-        @apply bg-surface-raised text-zinc-100 border-surface-border placeholder:text-zinc-500;
+        @apply bg-surface-raised text-slate-100 border-surface-border placeholder:text-slate-400;
     }
 
     input[type='file']::file-selector-button {
-        @apply mr-3 rounded border-0 bg-surface-muted px-3 py-1.5 text-sm font-medium text-zinc-200;
+        @apply mr-3 rounded border-0 bg-surface-muted px-3 py-1.5 text-sm font-semibold text-slate-100;
     }
 
     input[type='checkbox'],
     input[type='radio'] {
-        @apply border-surface-border bg-surface-raised text-glory-600 focus:ring-glory-500 focus:ring-offset-[#0b090a];
+        @apply border-surface-border bg-surface-raised text-glory-500 focus:ring-glory-400 focus:ring-offset-[#0B0F14];
     }
 }
 
 @layer components {
     .btn-primary {
-        @apply inline-flex items-center justify-center gap-2 rounded-lg bg-glory-600 px-3.5 py-2 text-sm font-medium text-white transition hover:bg-glory-500 focus:outline-none focus:ring-2 focus:ring-glory-400 focus:ring-offset-2 focus:ring-offset-[#0b090a];
+        @apply inline-flex items-center justify-center gap-2 rounded-lg bg-glory-500 px-4 py-2.5 text-[15px] font-semibold leading-none text-white transition hover:bg-glory-400 focus:outline-none focus:ring-2 focus:ring-glory-400 focus:ring-offset-2 focus:ring-offset-[#0B0F14];
     }
 
     .btn-secondary {
-        @apply inline-flex items-center justify-center gap-2 rounded-lg border border-surface-border bg-transparent px-3.5 py-2 text-sm font-medium text-zinc-300 transition hover:border-zinc-500 hover:bg-white/[0.03] hover:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-glory-400/40 focus:ring-offset-2 focus:ring-offset-[#0b090a];
+        @apply inline-flex items-center justify-center gap-2 rounded-lg border border-surface-border bg-surface-raised px-4 py-2.5 text-[15px] font-semibold leading-none text-slate-100 transition hover:border-slate-400 hover:bg-surface-muted hover:text-white focus:outline-none focus:ring-2 focus:ring-glory-400/50 focus:ring-offset-2 focus:ring-offset-[#0B0F14];
     }
 
     .btn-danger-ghost {
-        @apply inline-flex items-center justify-center rounded-lg px-2.5 py-1.5 text-sm font-medium text-red-400/90 transition hover:bg-red-500/10 hover:text-red-300;
+        @apply inline-flex items-center justify-center rounded-lg px-2.5 py-1.5 text-sm font-semibold text-red-300 transition hover:bg-red-500/10 hover:text-red-200;
     }
 
     .panel {

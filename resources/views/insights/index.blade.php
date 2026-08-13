@@ -18,7 +18,7 @@
                 <div class="inline-flex rounded-md border border-zinc-600 bg-zinc-900 p-0.5">
                     @foreach ($tabs as $key => $label)
                         <a href="{{ route('insights.index', ['platform' => $key, 'range' => $range]) }}"
-                           class="rounded px-3 py-1.5 text-sm {{ $platform === $key ? 'bg-glory-600 text-white' : 'text-zinc-300 hover:text-zinc-100' }}">
+                           class="rounded-lg px-3 py-2 text-[15px] font-semibold {{ $platform === $key ? 'bg-glory-500 text-white' : 'text-slate-200 hover:text-white' }}">
                             {{ $label }}
                         </a>
                     @endforeach
@@ -35,7 +35,7 @@
                 </select>
 
                 <a href="{{ route('insights.index', ['platform' => $platform, 'range' => $range, 'fresh' => 1]) }}"
-                   class="rounded-md bg-glory-600 px-3 py-2 text-sm font-medium text-white hover:bg-glory-700">
+                   class="btn-primary">
                     Refresh
                 </a>
             </div>

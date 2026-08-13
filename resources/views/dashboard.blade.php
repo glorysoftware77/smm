@@ -152,12 +152,12 @@
                             </div>
 
                             <div class="flex shrink-0 flex-wrap justify-end gap-2">
-                                <a href="{{ $p['connect'] }}" class="btn-primary text-xs">{{ $p['connectLabel'] }}</a>
+                                <a href="{{ $p['connect'] }}" class="btn-primary">{{ $p['connectLabel'] }}</a>
 
                                 @if ($p['showRefresh'])
                                     <form method="POST" action="{{ $p['refresh'] }}">
                                         @csrf
-                                        <button type="submit" class="btn-secondary text-xs">Refresh</button>
+                                        <button type="submit" class="btn-secondary">Refresh</button>
                                     </form>
                                 @endif
 
@@ -166,7 +166,7 @@
                                           onsubmit="return confirm(@js($p['disconnectConfirm']));">
                                         @csrf
                                         @method('DELETE')
-                                        <button type="submit" class="btn-secondary text-xs">Disconnect</button>
+                                        <button type="submit" class="btn-secondary">Disconnect</button>
                                     </form>
                                 @endif
                             </div>
