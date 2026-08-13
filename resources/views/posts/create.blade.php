@@ -34,6 +34,7 @@
                             x-data="multiPublish({
                                 pages: {{ Js::from($pagesPayload) }},
                                 publishUrl: {{ Js::from(route('posts.store')) }},
+                                generateUrl: {{ Js::from(route('posts.generate')) }},
                                 csrf: {{ Js::from(csrf_token()) }},
                             })"
                             class="space-y-6"
@@ -61,16 +62,44 @@
                                     <p x-show="error && !statuses.length" class="mt-2 text-sm text-red-600" x-text="error"></p>
                                 </div>
 
-                                <div>
-                                    <x-input-label for="title" :value="__('Title (YouTube / TikTok / FB Reels)')" />
-                                    <x-text-input id="title" name="title" class="mt-1 block w-full" x-model="title" />
+                                <div class="rounded-xl border border-[#E4E7EC] bg-[#F5F6F8] p-4 space-y-3">
+                                    <div>
+                                        <x-input-label for="ai_prompt" :value="__('Generate with Gemini')" />
+                                        <p class="mt-1 text-xs text-[#5C6570]">
+                                            Writes a YouTube/FB Reel title, FB/IG/YouTube caption (keeps emojis), and hashtags.
+                                        </p>
+                                        <textarea id="ai_prompt" rows="3" x-model="prompt"
+                                                  class="mt-2 block w-full border-[#E4E7EC] focus:border-glory-500 focus:ring-glory-500 rounded-md shadow-sm"
+                                                  placeholder="e.g. Summer AC service offer in Chennai, 20% off this week, call to book"></textarea>
+                                    </div>
+                                    <div class="flex items-center gap-3">
+                                        <button type="button" class="btn-secondary" x-bind:disabled="generating" @click="generateCopy">
+                                            <span x-show="!generating">Generate copy</span>
+                                            <span x-show="generating" x-cloak>Generating…</span>
+                                        </button>
+                                        <p class="text-sm text-red-600" x-show="generateError" x-text="generateError"></p>
+                                    </div>
                                 </div>
 
                                 <div>
-                                    <x-input-label for="message" :value="__('Message / Caption / Description')" />
-                                    <textarea id="message" name="message" rows="5" x-model="message"
-                                              class="mt-1 block w-full border-[#E4E7EC] focus:border-glory-400 focus:ring-glory-400 rounded-md shadow-sm"
-                                              placeholder="Write your post..."></textarea>
+                                    <x-input-label for="title" :value="__('Title (YouTube / Facebook Reels)')" />
+                                    <x-text-input id="title" name="title" class="mt-1 block w-full" x-model="title" maxlength="100" />
+                                    <p class="mt-1 text-xs text-[#5C6570]">YouTube title &amp; Facebook Reel title. Max 100 characters.</p>
+                                </div>
+
+                                <div>
+                                    <x-input-label for="description" :value="__('Caption / description (Facebook, Instagram, YouTube)')" />
+                                    <textarea id="description" name="description" rows="7" x-model="description"
+                                              class="mt-1 block w-full border-[#E4E7EC] focus:border-glory-500 focus:ring-glory-500 rounded-md shadow-sm"
+                                              placeholder="Write your post… emojis and line breaks are kept."></textarea>
+                                </div>
+
+                                <div>
+                                    <x-input-label for="hashtags" :value="__('Hashtags')" />
+                                    <textarea id="hashtags" name="hashtags" rows="2" x-model="hashtags"
+                                              class="mt-1 block w-full border-[#E4E7EC] focus:border-glory-500 focus:ring-glory-500 rounded-md shadow-sm"
+                                              placeholder="#YourBrand #Topic"></textarea>
+                                    <p class="mt-1 text-xs text-[#5C6570]">Appended under the caption for Instagram, Facebook, and YouTube.</p>
                                 </div>
 
                                 <div>
@@ -165,18 +194,22 @@
 
     @push('scripts')
         <script>
-            function multiPublish({ pages, publishUrl, csrf }) {
+            function multiPublish({ pages, publishUrl, generateUrl, csrf }) {
                 return {
                     pages,
                     selected: pages.map(p => String(p.id)),
+                    prompt: '',
                     title: '',
-                    message: '',
+                    description: '',
+                    hashtags: '',
                     imageFile: null,
                     videoFile: null,
                     youtubePrivacy: 'private',
                     youtubeAsShort: false,
                     tiktokPrivacy: 'SELF_ONLY',
                     publishing: false,
+                    generating: false,
+                    generateError: '',
                     done: false,
                     error: '',
                     statuses: [],
@@ -184,6 +217,12 @@
                         return this.pages
                             .filter(p => this.selected.includes(String(p.id)))
                             .map(p => p.provider);
+                    },
+                    get composedMessage() {
+                        const description = (this.description || '').trim();
+                        const hashtags = (this.hashtags || '').trim();
+                        if (description && hashtags) return description + '\n\n' + hashtags;
+                        return description || hashtags;
                     },
                     get hasFailures() {
                         return this.statuses.some(s => s.status === 'failed');
@@ -194,6 +233,44 @@
                         if (item.status === 'published') return item.label + ' posted';
                         if (item.status === 'failed') return item.label + ' failed';
                         return item.status;
+                    },
+                    async generateCopy() {
+                        this.generateError = '';
+                        if (!this.prompt.trim()) {
+                            this.generateError = 'Enter a prompt first.';
+                            return;
+                        }
+
+                        this.generating = true;
+                        try {
+                            const response = await fetch(generateUrl, {
+                                method: 'POST',
+                                headers: {
+                                    'X-CSRF-TOKEN': csrf,
+                                    'Accept': 'application/json',
+                                    'Content-Type': 'application/json',
+                                    'X-Requested-With': 'XMLHttpRequest',
+                                },
+                                body: JSON.stringify({
+                                    prompt: this.prompt,
+                                    platforms: this.selectedProviders.length
+                                        ? [...new Set(this.selectedProviders)]
+                                        : ['facebook', 'instagram', 'youtube'],
+                                }),
+                            });
+                            const data = await response.json().catch(() => ({}));
+                            if (!response.ok || data.success === false) {
+                                this.generateError = data.message || 'Could not generate copy.';
+                                return;
+                            }
+                            this.title = data.title || '';
+                            this.description = data.description || '';
+                            this.hashtags = data.hashtags || '';
+                        } catch (e) {
+                            this.generateError = e.message || 'Network error.';
+                        } finally {
+                            this.generating = false;
+                        }
                     },
                     async publishAll() {
                         this.error = '';
@@ -222,7 +299,7 @@
                             this.error = 'Instagram requires an image or video.';
                             return;
                         }
-                        if (targets.some(p => p.provider === 'facebook') && !this.message && !this.imageFile && !this.videoFile) {
+                        if (targets.some(p => p.provider === 'facebook') && !this.composedMessage && !this.imageFile && !this.videoFile) {
                             this.error = 'Facebook needs text, an image, or a video.';
                             return;
                         }
@@ -247,7 +324,7 @@
                             const body = new FormData();
                             body.append('social_page_id', target.id);
                             body.append('title', this.title || '');
-                            body.append('message', this.message || '');
+                            body.append('message', this.composedMessage || '');
                             body.append('youtube_privacy', this.youtubePrivacy);
                             if (this.youtubeAsShort) body.append('youtube_as_short', '1');
                             body.append('tiktok_privacy', this.tiktokPrivacy);

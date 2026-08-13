@@ -48,6 +48,7 @@ Route::middleware('auth')->group(function () {
     Route::delete('/tiktok/disconnect', [TikTokConnectController::class, 'disconnectAccount'])->name('tiktok.disconnect');
 
     Route::get('/posts/create', [PostController::class, 'create'])->name('posts.create');
+    Route::post('/posts/generate', [PostController::class, 'generate'])->name('posts.generate');
     Route::post('/posts', [PostController::class, 'store'])->name('posts.store');
     Route::post('/posts/{post}/insights', [PostController::class, 'refreshInsights'])->name('posts.insights.refresh');
 

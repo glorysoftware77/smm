@@ -6,6 +6,7 @@ use App\Models\Post;
 use App\Models\SocialAccount;
 use App\Models\SocialPage;
 use App\Services\FacebookService;
+use App\Services\GeminiService;
 use App\Services\InstagramService;
 use App\Services\TikTokService;
 use App\Services\YouTubeService;
@@ -32,6 +33,39 @@ class PostController extends Controller
 
         return view('posts.create', [
             'pages' => $pages,
+        ]);
+    }
+
+    public function generate(Request $request, GeminiService $gemini): JsonResponse
+    {
+        $validated = $request->validate([
+            'prompt' => ['required', 'string', 'max:2000'],
+            'platforms' => ['nullable', 'array'],
+            'platforms.*' => ['in:facebook,instagram,youtube,tiktok'],
+        ]);
+
+        $platforms = $validated['platforms'] ?? ['facebook', 'instagram', 'youtube'];
+
+        if ($platforms === []) {
+            $platforms = ['facebook', 'instagram', 'youtube'];
+        }
+
+        try {
+            $copy = $gemini->generatePostCopy($validated['prompt'], $platforms);
+        } catch (Throwable $e) {
+            report($e);
+
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'title' => $copy['title'],
+            'description' => $copy['description'],
+            'hashtags' => $copy['hashtags'],
         ]);
     }
 
