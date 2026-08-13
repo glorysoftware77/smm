@@ -15,15 +15,17 @@
 
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="font-semibold text-xl text-[#1A1D23] leading-tight">
+        <p class="kicker">Composer</p>
+        <h2 class="mt-2 text-3xl font-semibold tracking-tight text-[#1A1D23]">
             {{ __('Create Post') }}
         </h2>
+        <p class="mt-2 text-[15px] text-[#5C534C]">Write once, publish to the accounts you select.</p>
     </x-slot>
 
-    <div class="py-12">
-        <div class="max-w-3xl mx-auto sm:px-6 lg:px-8 space-y-6">
-            <div class="bg-white border border-[#E4E7EC] overflow-hidden shadow-sm sm:rounded-lg">
-                <div class="p-6 text-[#1A1D23]">
+    <div class="py-10">
+        <div class="mx-auto max-w-3xl space-y-6 px-4 sm:px-6 lg:px-8">
+            <div class="panel">
+                <div class="p-6 sm:p-8 text-[#1A1D23]">
                     @if ($pages->isEmpty())
                         <p class="text-sm text-[#5C6570]">
                             Connect Facebook, Instagram, YouTube, or TikTok first from the
@@ -42,38 +44,40 @@
                             <form @submit.prevent="publishAll" enctype="multipart/form-data" class="space-y-6">
                                 <div>
                                     <x-input-label :value="__('Publish to')" />
-                                    <div class="mt-2 space-y-2 rounded-md border border-[#E4E7EC] p-3">
+                                    <div class="mt-3 grid gap-2">
                                         <template x-for="page in pages" :key="page.id">
-                                            <label class="flex items-center gap-3 text-sm text-[#1A1D23]">
+                                            <label class="flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 transition"
+                                                   :class="selected.includes(String(page.id)) ? 'border-glory-500 bg-glory-50' : 'border-[#E8E1DB] bg-white hover:bg-[#FAF8F6]'">
                                                 <input type="checkbox"
-                                                       class="rounded border-[#E4E7EC] text-glory-500 shadow-sm focus:ring-glory-400"
+                                                       class="rounded border-[#C4B8B0] text-glory-500 shadow-sm focus:ring-glory-500"
                                                        :value="page.id"
                                                        x-model="selected">
                                                 <span>
-                                                    <span class="font-medium" x-text="page.label"></span>
-                                                    <span class="text-[#5C6570]"> — <span x-text="page.name"></span></span>
+                                                    <span class="block text-sm font-semibold" x-text="page.label"></span>
+                                                    <span class="block text-xs text-[#8B8680]" x-text="page.name"></span>
                                                 </span>
                                             </label>
                                         </template>
                                     </div>
-                                    <p class="mt-1 text-xs text-[#5C6570]">
+                                    <p class="mt-2 text-xs text-[#8B8680]">
                                         Select one or more. FB videos → Reels. IG needs image/video. YouTube & TikTok need video.
                                     </p>
                                     <p x-show="error && !statuses.length" class="mt-2 text-sm text-red-600" x-text="error"></p>
                                 </div>
 
-                                <div class="rounded-xl border border-[#E4E7EC] bg-[#F5F6F8] p-4 space-y-3">
+                                <div class="rounded-2xl border border-[#E8E1DB] bg-[#FAF8F6] p-5 space-y-3">
                                     <div>
-                                        <x-input-label for="ai_prompt" :value="__('Generate with Gemini')" />
-                                        <p class="mt-1 text-xs text-[#5C6570]">
+                                        <p class="kicker">AI assist</p>
+                                        <x-input-label for="ai_prompt" class="mt-2" :value="__('Generate with Gemini')" />
+                                        <p class="mt-1 text-xs text-[#8B8680]">
                                             Writes a YouTube/FB Reel title, FB/IG/YouTube caption (keeps emojis), and hashtags.
                                         </p>
                                         <textarea id="ai_prompt" rows="3" x-model="prompt"
-                                                  class="mt-2 block w-full border-[#E4E7EC] focus:border-glory-500 focus:ring-glory-500 rounded-md shadow-sm"
+                                                  class="mt-3 block w-full border-[#DDD6D0] focus:border-glory-500 focus:ring-glory-500 rounded-xl shadow-sm"
                                                   placeholder="e.g. Summer AC service offer in Chennai, 20% off this week, call to book"></textarea>
                                     </div>
                                     <div class="flex items-center gap-3">
-                                        <button type="button" class="btn-secondary" x-bind:disabled="generating" @click="generateCopy">
+                                        <button type="button" class="btn-primary" x-bind:disabled="generating" @click="generateCopy">
                                             <span x-show="!generating">Generate copy</span>
                                             <span x-show="generating" x-cloak>Generating…</span>
                                         </button>

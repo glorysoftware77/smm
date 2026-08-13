@@ -2,9 +2,9 @@
     <x-slot name="header">
         <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
-                <p class="text-xs font-medium uppercase tracking-[0.18em] text-glory-500">Admin</p>
-                <h2 class="mt-1 text-2xl font-semibold tracking-tight text-[#1A1D23]">Users</h2>
-                <p class="mt-1 max-w-xl text-sm text-[#5C6570]">
+                <p class="kicker">Admin</p>
+                <h2 class="mt-2 text-3xl font-semibold tracking-tight text-[#1A1D23]">Users</h2>
+                <p class="mt-2 max-w-xl text-[15px] text-[#5C534C]">
                     Create a Glory SMM login per client. Then open their Chrome profile, sign in here, and Connect their social accounts.
                 </p>
             </div>

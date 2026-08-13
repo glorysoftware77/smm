@@ -78,9 +78,9 @@
     <x-slot name="header">
         <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
-                <p class="text-xs font-medium uppercase tracking-[0.18em] text-glory-500">Workspace</p>
-                <h2 class="mt-1 text-2xl font-semibold tracking-tight text-[#1A1D23]">Connected accounts</h2>
-                <p class="mt-1 max-w-xl text-sm text-[#5C6570]">
+                <p class="kicker">Workspace</p>
+                <h2 class="mt-2 text-3xl font-semibold tracking-tight text-[#1A1D23]">Connected accounts</h2>
+                <p class="mt-2 max-w-xl text-[15px] leading-relaxed text-[#5C534C]">
                     Link the networks you publish to. Connected profiles show up in Create Post and Insights.
                 </p>
             </div>
@@ -104,21 +104,21 @@
                 </div>
             @endif
 
-            <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                <div class="panel px-4 py-4">
-                    <div class="text-[11px] font-medium uppercase tracking-wider text-[#5C6570]">Networks</div>
-                    <div class="mt-1 text-2xl font-semibold text-[#1A1D23]">{{ $connectedCount }}<span class="text-base font-normal text-[#5C6570]"> / 4</span></div>
+            <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+                <div class="panel px-5 py-5">
+                    <div class="kicker">Networks</div>
+                    <div class="mt-3 text-3xl font-semibold tracking-tight text-[#1A1D23]">{{ $connectedCount }}<span class="text-lg font-normal text-[#8B8680]"> / 4</span></div>
                 </div>
-                <div class="panel px-4 py-4">
-                    <div class="text-[11px] font-medium uppercase tracking-wider text-[#5C6570]">Profiles</div>
-                    <div class="mt-1 text-2xl font-semibold text-[#1A1D23]">{{ $accountCount }}</div>
+                <div class="panel px-5 py-5">
+                    <div class="kicker">Profiles</div>
+                    <div class="mt-3 text-3xl font-semibold tracking-tight text-[#1A1D23]">{{ $accountCount }}</div>
                 </div>
-                <div class="panel col-span-2 px-4 py-4">
-                    <div class="text-[11px] font-medium uppercase tracking-wider text-[#5C6570]">Status</div>
-                    <div class="mt-2 flex flex-wrap gap-2">
+                <div class="panel col-span-2 px-5 py-5">
+                    <div class="kicker">Status</div>
+                    <div class="mt-3 flex flex-wrap gap-2">
                         @foreach ($platforms as $p)
-                            <span class="inline-flex items-center gap-2 rounded-full border border-[#E4E7EC] bg-[#F5F6F8] px-2.5 py-1 text-xs text-[#5C6570]">
-                                <span class="status-dot {{ $p['connected'] ? 'bg-emerald-500' : 'bg-[#C5CBD4]' }}"></span>
+                            <span class="inline-flex items-center gap-2 rounded-full border border-[#E8E1DB] bg-[#FAF8F6] px-3 py-1.5 text-xs font-semibold text-[#5C534C]">
+                                <span class="status-dot {{ $p['connected'] ? 'bg-emerald-500' : 'bg-[#C4B8B0]' }}"></span>
                                 {{ $p['label'] }}
                             </span>
                         @endforeach
@@ -126,12 +126,13 @@
                 </div>
             </div>
 
-            <div class="grid gap-4 lg:grid-cols-2">
+            <div class="grid gap-5 lg:grid-cols-2">
                 @foreach ($platforms as $p)
-                    <section class="panel">
-                        <div class="flex items-start justify-between gap-4 border-b border-[#E4E7EC] px-5 py-4">
+                    <section class="panel relative">
+                        <div class="absolute inset-y-0 left-0 w-1 {{ $p['accent'] }}"></div>
+                        <div class="flex items-start justify-between gap-4 border-b border-[#E8E1DB] px-6 py-5">
                             <div class="flex min-w-0 items-start gap-3">
-                                <div class="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl {{ $p['accent'] }} text-sm font-bold text-white shadow-soft">
+                                <div class="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl {{ $p['accent'] }} text-sm font-bold text-white shadow-soft">
                                     @if ($p['key'] === 'facebook') f
                                     @elseif ($p['key'] === 'instagram') Ig
                                     @elseif ($p['key'] === 'youtube') ▶
@@ -172,7 +173,7 @@
                             </div>
                         </div>
 
-                        <div class="px-5 py-3">
+                        <div class="px-6 py-4">
                             @if ($p['accounts']->isEmpty())
                                 <p class="py-3 text-sm text-[#5C6570]">{{ $p['empty'] }}</p>
                             @else

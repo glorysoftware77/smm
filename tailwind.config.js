@@ -25,18 +25,12 @@ export default {
                     900: '#261118',
                     950: '#16090d',
                 },
-                surface: {
-                    DEFAULT: '#FFFFFF',
-                    raised: '#F5F6F8',
-                    muted: '#EEF0F3',
-                    border: '#E4E7EC',
-                },
             },
             fontFamily: {
                 sans: ['Outfit', ...defaultTheme.fontFamily.sans],
             },
             boxShadow: {
-                soft: '0 1px 2px rgba(26, 29, 35, 0.06), 0 8px 24px -12px rgba(26, 29, 35, 0.12)',
+                soft: '0 1px 2px rgba(26, 29, 35, 0.04), 0 16px 40px -24px rgba(26, 29, 35, 0.18)',
             },
         },
     },

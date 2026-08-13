@@ -7,8 +7,9 @@
     <x-slot name="header">
         <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
-                <h2 class="font-semibold text-xl text-[#1A1D23] leading-tight">{{ __('Insights') }}</h2>
-                <p class="text-sm text-[#5C6570]">
+                <p class="kicker">Analytics</p>
+                <h2 class="mt-2 font-semibold text-3xl tracking-tight text-[#1A1D23] leading-tight">{{ __('Insights') }}</h2>
+                <p class="mt-2 text-[15px] text-[#5C534C]">
                     {{ $pageName ?? 'No account connected' }}
                     <span class="text-[#5C6570]">· {{ $rangeFrom->format('j M Y') }} – {{ $rangeTo->format('j M Y') }}</span>
                 </p>

@@ -13,7 +13,7 @@
 
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
-    <body class="font-sans antialiased text-[#1A1D23] bg-[#F5F6F8]">
+    <body class="font-sans antialiased text-[#1A1D23]">
         <div class="flex min-h-screen flex-col items-center justify-center px-4 py-10 sm:px-6">
             <a href="/" class="mb-8 flex flex-col items-center gap-3">
                 <x-application-logo variant="full" class="h-24 w-24 rounded-2xl shadow-soft ring-1 ring-[#E4E7EC]" />
