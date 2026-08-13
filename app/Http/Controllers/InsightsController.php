@@ -23,7 +23,7 @@ class InsightsController extends Controller
 
     private const DEFAULT_RANGE = 28;
 
-    private const CACHE_MINUTES = 10;
+    private const CACHE_MINUTES = 45;
 
     public function index(
         Request $request,
@@ -52,7 +52,7 @@ class InsightsController extends Controller
         } elseif ($platform === 'instagram' && $page) {
             try {
                 $rows = $this->instagramRows($page, $instagram, $from, $to, $request->boolean('fresh'));
-                $pageStats = $this->instagramPageStats($page, $instagram);
+                $pageStats = $this->instagramPageStats($page, $instagram, $from, $to);
             } catch (Throwable $e) {
                 report($e);
                 $error = $this->instagramError($e);
@@ -90,7 +90,9 @@ class InsightsController extends Controller
         $page = $this->connectedPage($request, $platform);
 
         if ($page) {
-            Cache::forget($this->cacheKey($page, ...$this->rangeBounds($range)));
+            [$from, $to] = $this->rangeBounds($range);
+            Cache::forget($this->cacheKey($page, $from, $to));
+            Cache::forget($this->statsCacheKey($page, $from, $to));
         }
 
         return redirect()->route('insights.index', [
@@ -124,6 +126,7 @@ class InsightsController extends Controller
                 $page->access_token,
                 $from->timestamp,
                 $to->timestamp,
+                25,
             );
         });
 
@@ -185,6 +188,7 @@ class InsightsController extends Controller
                 $page->access_token,
                 $from->timestamp,
                 $to->timestamp,
+                25,
             );
         });
 
@@ -327,44 +331,56 @@ class InsightsController extends Controller
      */
     private function facebookPageStats(SocialPage $page, FacebookService $facebook, Carbon $from, Carbon $to): array
     {
-        $stats = ['followers' => null, 'new_follows' => null, 'page_views' => null];
+        return Cache::remember(
+            $this->statsCacheKey($page, $from, $to),
+            now()->addMinutes(self::CACHE_MINUTES),
+            function () use ($page, $facebook, $from, $to) {
+                $stats = ['followers' => null, 'new_follows' => null, 'page_views' => null];
 
-        try {
-            $insights = $facebook->getPageSummaryInsights(
-                $page->page_id,
-                $page->access_token,
-                $from->timestamp,
-                $to->timestamp,
-            );
+                try {
+                    $insights = $facebook->getPageSummaryInsights(
+                        $page->page_id,
+                        $page->access_token,
+                        $from->timestamp,
+                        $to->timestamp,
+                    );
 
-            $stats['followers'] = $insights['followers_count'] ?? null;
-            $stats['new_follows'] = $insights['page_daily_follows_unique']
-                ?? $insights['page_daily_follows']
-                ?? $insights['page_follows']
-                ?? null;
-            $stats['page_views'] = $insights['page_views_total'] ?? $insights['page_media_view'] ?? null;
-        } catch (Throwable $e) {
-            report($e);
-        }
+                    $stats['followers'] = $insights['followers_count'] ?? null;
+                    $stats['new_follows'] = $insights['page_daily_follows_unique']
+                        ?? $insights['page_daily_follows']
+                        ?? $insights['page_follows']
+                        ?? null;
+                    $stats['page_views'] = $insights['page_views_total'] ?? $insights['page_media_view'] ?? null;
+                } catch (Throwable $e) {
+                    report($e);
+                }
 
-        return $stats;
+                return $stats;
+            }
+        );
     }
 
     /**
      * @return array<string, mixed>
      */
-    private function instagramPageStats(SocialPage $page, InstagramService $instagram): array
+    private function instagramPageStats(SocialPage $page, InstagramService $instagram, Carbon $from, Carbon $to): array
     {
-        $stats = ['followers' => null, 'new_follows' => null, 'page_views' => null];
+        return Cache::remember(
+            $this->statsCacheKey($page, $from, $to),
+            now()->addMinutes(self::CACHE_MINUTES),
+            function () use ($page, $instagram) {
+                $stats = ['followers' => null, 'new_follows' => null, 'page_views' => null];
 
-        try {
-            $summary = $instagram->getAccountSummary($page->page_id, $page->access_token);
-            $stats['followers'] = $summary['followers_count'] ?? null;
-        } catch (Throwable $e) {
-            report($e);
-        }
+                try {
+                    $summary = $instagram->getAccountSummary($page->page_id, $page->access_token);
+                    $stats['followers'] = $summary['followers_count'] ?? null;
+                } catch (Throwable $e) {
+                    report($e);
+                }
 
-        return $stats;
+                return $stats;
+            }
+        );
     }
 
     /**
@@ -401,6 +417,11 @@ class InsightsController extends Controller
     private function cacheKey(SocialPage $page, Carbon $from, Carbon $to): string
     {
         return sprintf('insights:%s:%d:%s:%s', $page->provider, $page->id, $from->toDateString(), $to->toDateString());
+    }
+
+    private function statsCacheKey(SocialPage $page, Carbon $from, Carbon $to): string
+    {
+        return sprintf('insights-stats:%s:%d:%s:%s', $page->provider, $page->id, $from->toDateString(), $to->toDateString());
     }
 
     private function instagramError(Throwable $error): string

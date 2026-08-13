@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -343,26 +342,21 @@ class FacebookService
      */
     private const POST_INSIGHT_METRICS = [
         'post_media_view',
-        'post_total_media_view_unique',
         'post_impressions_unique',
-        'post_impressions_organic_unique',
         'post_video_views',
-        'post_video_views_unique',
-        'post_video_avg_time_watched',
-        'post_video_view_time',
-        'post_clicks',
     ];
 
     /**
-     * Every published item on the Page for a date window, regardless of which
-     * tool published it, with insights and engagement counts attached.
+     * Page feed for a date window with engagement from the feed payload and
+     * views/reach from a Graph batch (not one HTTP call per post).
      *
      * @return array<int, array<string, mixed>>
      */
-    public function getPageContent(string $pageId, string $pageAccessToken, int $since, int $until, int $maxItems = 100): array
+    public function getPageContent(string $pageId, string $pageAccessToken, int $since, int $until, int $maxItems = 25): array
     {
         $items = $this->fetchPageFeed($pageId, $pageAccessToken, $since, $until, $maxItems);
-        $metrics = $this->supportedPostMetrics($pageId, $pageAccessToken, $items);
+        $ids = array_values(array_filter(array_map(fn ($item) => $item['id'] ?? null, $items)));
+        $insightMap = $this->batchPostInsights($ids, $pageAccessToken);
         $content = [];
 
         foreach ($items as $item) {
@@ -371,20 +365,6 @@ class FacebookService
             if (! $objectId) {
                 continue;
             }
-
-            $insights = [];
-
-            if ($metrics !== []) {
-                $response = $this->insightsRequest($objectId, $pageAccessToken, [
-                    'metric' => implode(',', $metrics),
-                ]);
-
-                if ($response->successful()) {
-                    $insights = $this->normalizeInsights($response->json('data', []));
-                }
-            }
-
-            $insights = array_merge($insights, $this->fetchFollowerBreakdown($objectId, $pageAccessToken));
 
             $attachment = data_get($item, 'attachments.data.0', []);
             $mediaType = strtolower((string) ($attachment['media_type'] ?? $attachment['type'] ?? ''));
@@ -399,7 +379,7 @@ class FacebookService
                 'reactions' => (int) (data_get($item, 'reactions.summary.total_count') ?? 0),
                 'comments' => (int) (data_get($item, 'comments.summary.total_count') ?? 0),
                 'shares' => (int) (data_get($item, 'shares.count') ?? 0),
-                'insights' => $insights,
+                'insights' => $insightMap[$objectId] ?? [],
             ];
         }
 
@@ -420,7 +400,7 @@ class FacebookService
                 'fields' => $fields,
                 'since' => $since,
                 'until' => $until,
-                'limit' => 50,
+                'limit' => min(50, $maxItems),
                 'access_token' => $pageAccessToken,
                 'appsecret_proof' => $this->appSecretProof($pageAccessToken),
             ]);
@@ -457,35 +437,50 @@ class FacebookService
     }
 
     /**
-     * Meta rejects the whole request when one metric is invalid, so probe the
-     * candidates once against a real post and remember what the API accepts.
-     *
-     * @param  array<int, array<string, mixed>>  $items
-     * @return array<int, string>
+     * @param  array<int, string>  $objectIds
+     * @return array<string, array<string, mixed>>
      */
-    private function supportedPostMetrics(string $pageId, string $pageAccessToken, array $items): array
+    private function batchPostInsights(array $objectIds, string $pageAccessToken): array
     {
-        $probeId = data_get($items, '0.id');
-
-        if (! $probeId) {
+        if ($objectIds === []) {
             return [];
         }
 
-        return Cache::remember(
-            'facebook:post-metrics:'.self::GRAPH_VERSION.':'.$pageId,
-            now()->addHours(12),
-            function () use ($probeId, $pageAccessToken) {
-                $supported = [];
+        $metric = implode(',', self::POST_INSIGHT_METRICS);
+        $map = [];
 
-                foreach (self::POST_INSIGHT_METRICS as $metric) {
-                    if ($this->insightsRequest($probeId, $pageAccessToken, ['metric' => $metric])->successful()) {
-                        $supported[] = $metric;
-                    }
+        foreach (array_chunk($objectIds, 50) as $chunk) {
+            $batch = array_map(fn (string $id) => [
+                'method' => 'GET',
+                'relative_url' => $id.'/insights?'.http_build_query(['metric' => $metric]),
+            ], $chunk);
+
+            $response = Http::asForm()->post($this->graphUrl('/'), [
+                'access_token' => $pageAccessToken,
+                'appsecret_proof' => $this->appSecretProof($pageAccessToken),
+                'batch' => json_encode($batch),
+            ]);
+
+            if (! $response->successful()) {
+                Log::warning('Facebook insights batch failed', ['body' => $response->body()]);
+
+                continue;
+            }
+
+            foreach ($response->json() ?? [] as $index => $row) {
+                $objectId = $chunk[$index] ?? null;
+                $code = (int) ($row['code'] ?? 0);
+
+                if (! $objectId || $code !== 200) {
+                    continue;
                 }
 
-                return $supported;
+                $body = json_decode((string) ($row['body'] ?? ''), true) ?: [];
+                $map[$objectId] = $this->normalizeInsights($body['data'] ?? []);
             }
-        );
+        }
+
+        return $map;
     }
 
     public function getPagePostInsights(string $objectId, string $pageAccessToken): array
@@ -571,59 +566,55 @@ class FacebookService
 
         $dayMetrics = [
             'page_follows',
-            'page_daily_follows',
             'page_daily_follows_unique',
-            'page_media_view',
-            'page_total_media_view_unique',
             'page_views_total',
-            'page_post_engagements',
+            'page_media_view',
         ];
 
-        foreach ($dayMetrics as $metric) {
-            $query = [
-                'metric' => $metric,
-                'period' => 'day',
-            ];
+        $query = [
+            'metric' => implode(',', $dayMetrics),
+            'period' => 'day',
+        ];
 
-            if ($since !== null && $until !== null) {
-                $query['since'] = $since;
-                $query['until'] = $until;
-            }
+        if ($since !== null && $until !== null) {
+            $query['since'] = $since;
+            $query['until'] = $until;
+        }
 
-            $response = $this->insightsRequest($pageId, $pageAccessToken, $query);
+        $response = $this->insightsRequest($pageId, $pageAccessToken, $query);
 
-            if (! $response->successful()) {
+        if (! $response->successful()) {
+            Log::info('Facebook page summary insights skipped', ['body' => $response->body()]);
+
+            return $collected;
+        }
+
+        foreach ($response->json('data', []) as $row) {
+            $name = $row['name'] ?? null;
+            $values = $row['values'] ?? [];
+
+            if (! $name || $values === []) {
                 continue;
             }
 
-            foreach ($response->json('data', []) as $row) {
-                $name = $row['name'] ?? null;
-                $values = $row['values'] ?? [];
+            $sum = 0;
+            $hasNumeric = false;
 
-                if (! $name || $values === []) {
+            foreach ($values as $entry) {
+                $value = $entry['value'] ?? null;
+
+                if (! is_numeric($value)) {
                     continue;
                 }
 
-                $sum = 0;
-                $hasNumeric = false;
+                $sum += (float) $value;
+                $hasNumeric = true;
+            }
 
-                foreach ($values as $entry) {
-                    $value = $entry['value'] ?? null;
-
-                    if (! is_numeric($value)) {
-                        continue;
-                    }
-
-                    $sum += (float) $value;
-                    $hasNumeric = true;
-                }
-
-                if ($hasNumeric) {
-                    // For ranged requests, sum daily values; otherwise keep latest day.
-                    $collected[$name] = ($since !== null && $until !== null)
-                        ? $sum
-                        : (float) (end($values)['value'] ?? $sum);
-                }
+            if ($hasNumeric) {
+                $collected[$name] = ($since !== null && $until !== null)
+                    ? $sum
+                    : (float) (end($values)['value'] ?? $sum);
             }
         }
 

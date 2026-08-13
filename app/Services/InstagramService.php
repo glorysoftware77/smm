@@ -2,9 +2,8 @@
 
 namespace App\Services;
 
-use Illuminate\Support\Facades\Cache;
+use Illuminate\Http\Client\Pool;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use RuntimeException;
 
@@ -137,9 +136,14 @@ class InstagramService
         string $accessToken,
         int $since,
         int $until,
-        int $maxItems = 100
+        int $maxItems = 25
     ): array {
         $media = $this->getMedia($igUserId, $accessToken, $since, $until, $maxItems);
+        $ids = array_values(array_filter(array_map(
+            fn ($item) => (string) ($item['id'] ?? ''),
+            $media
+        )));
+        $insightMap = $this->batchMediaInsights($ids, $accessToken);
         $content = [];
 
         foreach ($media as $item) {
@@ -150,8 +154,6 @@ class InstagramService
             }
 
             $type = strtoupper((string) ($item['media_type'] ?? ''));
-            $metrics = $this->supportedMediaMetrics($igUserId, $mediaId, $type, $accessToken);
-            $insights = $this->getMediaInsights($mediaId, $accessToken, $metrics);
 
             $content[] = [
                 'id' => $mediaId,
@@ -164,7 +166,7 @@ class InstagramService
                 'timestamp' => $item['timestamp'] ?? null,
                 'like_count' => (int) ($item['like_count'] ?? 0),
                 'comments_count' => (int) ($item['comments_count'] ?? 0),
-                'insights' => $insights,
+                'insights' => $insightMap[$mediaId] ?? [],
             ];
         }
 
@@ -239,90 +241,49 @@ class InstagramService
     }
 
     /**
-     * @param  array<int, string>  $metrics
-     * @return array<string, int|float>
+     * @param  array<int, string>  $mediaIds
+     * @return array<string, array<string, int|float>>
      */
-    private function getMediaInsights(string $mediaId, string $accessToken, array $metrics): array
+    private function batchMediaInsights(array $mediaIds, string $accessToken): array
     {
-        if ($metrics === []) {
+        if ($mediaIds === []) {
             return [];
         }
 
-        $response = Http::get($this->graphUrl('/'.$mediaId.'/insights'), [
-            'metric' => implode(',', $metrics),
-            'period' => 'lifetime',
-            'access_token' => $accessToken,
-        ]);
-
-        if (! $response->successful()) {
-            Log::warning('Instagram media insights failed', [
-                'media_id' => $mediaId,
-                'body' => $response->body(),
-            ]);
-
-            return [];
-        }
-
-        $normalized = [];
-
-        foreach ($response->json('data', []) as $row) {
-            $name = $row['name'] ?? null;
-            $value = data_get($row, 'values.0.value') ?? data_get($row, 'total_value.value');
-
-            if ($name && is_numeric($value)) {
-                $normalized[$name] = $value;
+        $responses = Http::pool(function (Pool $pool) use ($mediaIds, $accessToken) {
+            foreach ($mediaIds as $id) {
+                $pool->as($id)->get($this->graphUrl('/'.$id.'/insights'), [
+                    'metric' => 'views,reach',
+                    'period' => 'lifetime',
+                    'access_token' => $accessToken,
+                ]);
             }
-        }
+        });
 
-        return $normalized;
-    }
+        $map = [];
 
-    /**
-     * Probe once per account/media type because Meta supports different
-     * metrics for feed posts, carousels and Reels.
-     *
-     * @return array<int, string>
-     */
-    private function supportedMediaMetrics(
-        string $igUserId,
-        string $mediaId,
-        string $mediaType,
-        string $accessToken
-    ): array {
-        return Cache::remember(
-            'instagram:media-metrics:'.self::GRAPH_VERSION.':'.$igUserId.':'.$mediaType,
-            now()->addHours(12),
-            function () use ($mediaId, $accessToken) {
-                $candidates = [
-                    'views',
-                    'reach',
-                    'likes',
-                    'comments',
-                    'shares',
-                    'saved',
-                    'total_interactions',
-                    'follows',
-                    'profile_visits',
-                    'watch_time',
-                    'avg_watch_time',
-                ];
-                $supported = [];
+        foreach ($mediaIds as $id) {
+            $response = $responses[$id] ?? null;
 
-                foreach ($candidates as $metric) {
-                    $response = Http::get($this->graphUrl('/'.$mediaId.'/insights'), [
-                        'metric' => $metric,
-                        'period' => 'lifetime',
-                        'access_token' => $accessToken,
-                    ]);
+            if (! $response || ! $response->successful()) {
+                continue;
+            }
 
-                    if ($response->successful()) {
-                        $supported[] = $metric;
-                    }
+            $normalized = [];
+
+            foreach ($response->json('data', []) as $row) {
+                $name = $row['name'] ?? null;
+                $value = data_get($row, 'values.0.value') ?? data_get($row, 'total_value.value');
+
+                if ($name && is_numeric($value)) {
+                    $normalized[$name] = $value;
                 }
-
-                return $supported;
             }
-        );
+
+            $map[$id] = $normalized;
+        }
+
+        return $map;
     }
 
     public function generateState(): string
