@@ -2,9 +2,9 @@
     <x-slot name="header">
         <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
-                <p class="text-xs font-medium uppercase tracking-[0.18em] text-glory-400">Admin</p>
-                <h2 class="mt-1 text-2xl font-semibold tracking-tight text-white">Users</h2>
-                <p class="mt-1 max-w-xl text-sm text-zinc-400">
+                <p class="text-xs font-medium uppercase tracking-[0.18em] text-glory-500">Admin</p>
+                <h2 class="mt-1 text-2xl font-semibold tracking-tight text-[#1A1D23]">Users</h2>
+                <p class="mt-1 max-w-xl text-sm text-[#5C6570]">
                     Create a Glory SMM login per client. Then open their Chrome profile, sign in here, and Connect their social accounts.
                 </p>
             </div>
@@ -15,14 +15,14 @@
     <div class="py-8">
         <div class="mx-auto max-w-7xl space-y-4 px-4 sm:px-6 lg:px-8">
             @if (session('success'))
-                <div class="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
+                <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
                     {{ session('success') }}
                 </div>
             @endif
 
             <div class="panel overflow-hidden">
-                <table class="min-w-full divide-y divide-surface-border text-sm">
-                    <thead class="bg-surface-raised/60 text-left text-xs uppercase tracking-wider text-zinc-500">
+                <table class="min-w-full divide-y divide-[#E4E7EC] text-sm">
+                    <thead class="bg-[#F5F6F8]/60 text-left text-xs uppercase tracking-wider text-[#5C6570]">
                         <tr>
                             <th class="px-5 py-3 font-medium">Name</th>
                             <th class="px-5 py-3 font-medium">Email</th>
@@ -30,16 +30,16 @@
                             <th class="px-5 py-3 font-medium text-right">Actions</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-surface-border">
+                    <tbody class="divide-y divide-[#E4E7EC]">
                         @forelse ($users as $user)
                             <tr>
-                                <td class="px-5 py-3 font-medium text-zinc-100">{{ $user->name }}</td>
-                                <td class="px-5 py-3 text-zinc-400">{{ $user->email }}</td>
+                                <td class="px-5 py-3 font-medium text-[#1A1D23]">{{ $user->name }}</td>
+                                <td class="px-5 py-3 text-[#5C6570]">{{ $user->email }}</td>
                                 <td class="px-5 py-3">
                                     @if ($user->is_admin)
-                                        <span class="rounded-full bg-glory-700/30 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-glory-200">Admin</span>
+                                        <span class="rounded-full bg-glory-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-glory-600">Admin</span>
                                     @else
-                                        <span class="rounded-full bg-zinc-500/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-400">Client</span>
+                                        <span class="rounded-full bg-[#EEF0F3] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[#5C6570]">Client</span>
                                     @endif
                                 </td>
                                 <td class="px-5 py-3">
@@ -53,14 +53,14 @@
                                                 <button type="submit" class="btn-danger-ghost text-xs">Delete</button>
                                             </form>
                                         @else
-                                            <span class="text-xs text-zinc-600">—</span>
+                                            <span class="text-xs text-[#8B939E]">—</span>
                                         @endunless
                                     </div>
                                 </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="4" class="px-5 py-8 text-center text-zinc-500">No users yet.</td>
+                                <td colspan="4" class="px-5 py-8 text-center text-[#5C6570]">No users yet.</td>
                             </tr>
                         @endforelse
                     </tbody>

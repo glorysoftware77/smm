@@ -4,11 +4,11 @@
 
 @layer base {
     html {
-        color-scheme: dark;
+        color-scheme: light;
     }
 
     body {
-        @apply bg-[#0B0F14] text-slate-100 antialiased;
+        @apply bg-[#F5F6F8] text-[#1A1D23] antialiased;
     }
 
     input[type='text'],
@@ -21,34 +21,34 @@
     input[type='file'],
     textarea,
     select {
-        @apply bg-surface-raised text-slate-100 border-surface-border placeholder:text-slate-400;
+        @apply bg-white text-[#1A1D23] border-[#E4E7EC] placeholder:text-[#8B939E];
     }
 
     input[type='file']::file-selector-button {
-        @apply mr-3 rounded border-0 bg-surface-muted px-3 py-1.5 text-sm font-semibold text-slate-100;
+        @apply mr-3 rounded border-0 bg-[#EEF0F3] px-3 py-1.5 text-sm font-semibold text-[#1A1D23];
     }
 
     input[type='checkbox'],
     input[type='radio'] {
-        @apply border-surface-border bg-surface-raised text-glory-500 focus:ring-glory-400 focus:ring-offset-[#0B0F14];
+        @apply border-[#C5CBD4] bg-white text-glory-500 focus:ring-glory-500 focus:ring-offset-white;
     }
 }
 
 @layer components {
     .btn-primary {
-        @apply inline-flex items-center justify-center gap-2 rounded-lg bg-glory-500 px-4 py-2.5 text-[15px] font-semibold leading-none text-white transition hover:bg-glory-400 focus:outline-none focus:ring-2 focus:ring-glory-400 focus:ring-offset-2 focus:ring-offset-[#0B0F14];
+        @apply inline-flex items-center justify-center gap-2 rounded-lg bg-glory-500 px-4 py-2.5 text-[15px] font-semibold leading-none text-white transition hover:bg-glory-600 focus:outline-none focus:ring-2 focus:ring-glory-500 focus:ring-offset-2 focus:ring-offset-white;
     }
 
     .btn-secondary {
-        @apply inline-flex items-center justify-center gap-2 rounded-lg border border-surface-border bg-surface-raised px-4 py-2.5 text-[15px] font-semibold leading-none text-slate-100 transition hover:border-slate-400 hover:bg-surface-muted hover:text-white focus:outline-none focus:ring-2 focus:ring-glory-400/50 focus:ring-offset-2 focus:ring-offset-[#0B0F14];
+        @apply inline-flex items-center justify-center gap-2 rounded-lg border border-[#E4E7EC] bg-white px-4 py-2.5 text-[15px] font-semibold leading-none text-[#1A1D23] transition hover:border-[#C5CBD4] hover:bg-[#F5F6F8] focus:outline-none focus:ring-2 focus:ring-glory-500/30 focus:ring-offset-2 focus:ring-offset-white;
     }
 
     .btn-danger-ghost {
-        @apply inline-flex items-center justify-center rounded-lg px-2.5 py-1.5 text-sm font-semibold text-red-300 transition hover:bg-red-500/10 hover:text-red-200;
+        @apply inline-flex items-center justify-center rounded-lg px-2.5 py-1.5 text-sm font-semibold text-[#C0352B] transition hover:bg-red-50 hover:text-red-700;
     }
 
     .panel {
-        @apply overflow-hidden rounded-2xl border border-surface-border bg-surface shadow-soft;
+        @apply overflow-hidden rounded-2xl border border-[#E4E7EC] bg-white shadow-soft;
     }
 
     .status-dot {

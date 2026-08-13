@@ -1,9 +1,9 @@
 <x-app-layout>
     <x-slot name="header">
         <div>
-            <p class="text-xs font-medium uppercase tracking-[0.18em] text-glory-400">Admin</p>
-            <h2 class="mt-1 text-2xl font-semibold tracking-tight text-white">Edit user</h2>
-            <p class="mt-1 text-sm text-zinc-400">{{ $user->email }}</p>
+            <p class="text-xs font-medium uppercase tracking-[0.18em] text-glory-500">Admin</p>
+            <h2 class="mt-1 text-2xl font-semibold tracking-tight text-[#1A1D23]">Edit user</h2>
+            <p class="mt-1 text-sm text-[#5C6570]">{{ $user->email }}</p>
         </div>
     </x-slot>
 

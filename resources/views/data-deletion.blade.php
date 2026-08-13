@@ -1,15 +1,15 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="color-scheme" content="dark">
+    <meta name="color-scheme" content="light">
     <title>Data Deletion — Glory SMM</title>
     <style>
-        body { font-family: Georgia, serif; max-width: 720px; margin: 40px auto; padding: 0 20px; line-height: 1.6; color: #e4e4e7; background: #09090b; }
-        h1 { font-size: 1.8rem; color: #fafafa; }
-        h2 { font-size: 1.2rem; margin-top: 1.75rem; color: #f4f4f5; }
-        a { color: #818cf8; }
+        body { font-family: Georgia, serif; max-width: 720px; margin: 40px auto; padding: 0 20px; line-height: 1.6; color: #1A1D23; background: #F5F6F8; }
+        h1 { font-size: 1.8rem; color: #1A1D23; }
+        h2 { font-size: 1.2rem; margin-top: 1.75rem; color: #1A1D23; }
+        a { color: #6B2C3E; }
         ol { padding-left: 1.25rem; }
     </style>
 </head>

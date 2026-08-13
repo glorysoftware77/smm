@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="dark">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="csrf-token" content="{{ csrf_token() }}">
-        <meta name="color-scheme" content="dark">
+        <meta name="color-scheme" content="light">
 
         <title>{{ config('app.name', 'Glory SMM') }}</title>
 
@@ -13,12 +13,12 @@
 
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
-    <body class="font-sans antialiased text-zinc-100">
+    <body class="font-sans antialiased text-[#1A1D23] bg-[#F5F6F8]">
         <div class="min-h-screen">
             @include('layouts.navigation')
 
             @isset($header)
-                <header class="border-b border-surface-border bg-surface/80 backdrop-blur-md">
+                <header class="border-b border-[#E4E7EC] bg-white">
                     <div class="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
                         {{ $header }}
                     </div>
