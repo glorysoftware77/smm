@@ -32,7 +32,7 @@
             <div class="panel">
                 <div class="p-5 sm:p-8 text-[#1A1D23]">
                     @if ($pages->isEmpty())
-                        <div class="flex flex-col items-start gap-4 rounded-2xl border border-dashed border-[#D6CBC3] bg-[#FAF8F6] px-5 py-10">
+                        <div class="flex flex-col items-start gap-4 rounded-2xl border border-dashed border-[#C9B8AD] bg-[#EFE5DC] px-5 py-10">
                             <p class="kicker">Get started</p>
                             <p class="max-w-md text-sm leading-relaxed text-[#5C534C]">
                                 Connect Facebook, Instagram, YouTube, or TikTok first from the Dashboard before composing a post.
@@ -60,11 +60,9 @@
 
                                     <div class="grid gap-3 sm:grid-cols-2">
                                         <template x-for="page in pages" :key="page.id">
-                                            <label class="group relative flex cursor-pointer items-start gap-3 overflow-hidden rounded-2xl border px-4 py-4 transition"
-                                                   :class="selected.includes(String(page.id))
-                                                       ? 'border-glory-500 bg-glory-50/70 shadow-[0_0_0_1px_rgba(107,44,62,0.15)]'
-                                                       : 'border-[#E4D9D1] bg-white hover:border-[#C4B8B0] hover:bg-[#FAF8F6]'">
-                                                <span class="absolute inset-y-0 left-0 w-1"
+                                            <label class="account-tile"
+                                                   :class="selected.includes(String(page.id)) ? 'account-tile-on' : 'account-tile-off'">
+                                                <span class="absolute inset-y-0 left-0 w-1.5"
                                                       :class="{
                                                           'bg-[#1877F2]': page.provider === 'facebook',
                                                           'bg-gradient-to-b from-[#F58529] via-[#DD2A7B] to-[#8134AF]': page.provider === 'instagram',
@@ -72,10 +70,16 @@
                                                           'bg-[#1A1D23]': page.provider === 'tiktok',
                                                       }"></span>
                                                 <input type="checkbox"
-                                                       class="mt-1 rounded border-[#C4B8B0] text-glory-500 shadow-sm focus:ring-glory-500"
+                                                       class="sr-only"
                                                        :value="page.id"
                                                        x-model="selected">
-                                                <span class="min-w-0">
+                                                <span class="check-box mt-0.5"
+                                                      :class="selected.includes(String(page.id)) ? 'check-box-on' : ''">
+                                                    <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                                        <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+                                                    </svg>
+                                                </span>
+                                                <span class="min-w-0 flex-1">
                                                     <span class="flex items-center gap-2">
                                                         <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg text-[11px] font-bold text-white"
                                                               :class="{
@@ -86,8 +90,11 @@
                                                               }"
                                                               x-text="page.provider === 'facebook' ? 'f' : (page.provider === 'instagram' ? 'Ig' : (page.provider === 'youtube' ? '▶' : 'TT'))"></span>
                                                         <span class="text-sm font-semibold" x-text="page.label"></span>
+                                                        <span class="ml-auto rounded-full bg-glory-500 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white"
+                                                              x-show="selected.includes(String(page.id))"
+                                                              x-cloak>Selected</span>
                                                     </span>
-                                                    <span class="mt-1 block truncate text-xs text-[#8B8680]" x-text="page.name"></span>
+                                                    <span class="mt-1 block truncate text-xs text-[#6F655C]" x-text="page.name"></span>
                                                 </span>
                                             </label>
                                         </template>
@@ -100,7 +107,7 @@
                                 </section>
 
                                 {{-- Step 2: AI --}}
-                                <section class="section-card space-y-4 bg-gradient-to-br from-glory-50/80 via-white to-[#FAF8F6]">
+                                <section class="section-card space-y-4 border-glory-200 bg-gradient-to-br from-glory-100 via-[#F3EBE4] to-[#EFE5DC]">
                                     <div>
                                         <p class="kicker">Step 2 · AI assist</p>
                                         <h3 class="mt-1 text-lg font-semibold tracking-tight">Generate with Gemini</h3>
@@ -168,7 +175,7 @@
                                                 <input id="image" name="image" type="file" accept="image/jpeg,image/png,image/gif,image/webp"
                                                        class="absolute inset-0 cursor-pointer opacity-0"
                                                        @change="imageFile = $event.target.files[0] || null; if (imageFile) videoFile = null">
-                                                <span class="flex h-10 w-10 items-center justify-center rounded-full bg-white text-glory-500 shadow-sm ring-1 ring-[#E4D9D1]">
+                                                <span class="flex h-10 w-10 items-center justify-center rounded-full bg-glory-500 text-white shadow-sm">
                                                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" /></svg>
                                                 </span>
                                                 <span class="text-sm font-semibold text-[#1A1D23]" x-text="imageFile ? imageFile.name : 'Drop or browse image'"></span>
@@ -182,7 +189,7 @@
                                                 <input id="video" name="video" type="file" accept="video/mp4,video/quicktime,video/x-msvideo"
                                                        class="absolute inset-0 cursor-pointer opacity-0"
                                                        @change="videoFile = $event.target.files[0] || null; if (videoFile) imageFile = null">
-                                                <span class="flex h-10 w-10 items-center justify-center rounded-full bg-white text-glory-500 shadow-sm ring-1 ring-[#E4D9D1]">
+                                                <span class="flex h-10 w-10 items-center justify-center rounded-full bg-glory-500 text-white shadow-sm">
                                                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 010 1.972l-11.54 6.347a1.125 1.125 0 01-1.667-.986V5.653z" /></svg>
                                                 </span>
                                                 <span class="text-sm font-semibold text-[#1A1D23]" x-text="videoFile ? videoFile.name : 'Drop or browse video'"></span>
@@ -207,9 +214,13 @@
                                             <option value="public">Public</option>
                                         </select>
                                     </div>
-                                    <label class="inline-flex items-center gap-2 text-sm font-medium text-[#1A1D23]">
-                                        <input type="checkbox" x-model="youtubeAsShort"
-                                               class="rounded border-[#C4B8B0] text-glory-500 shadow-sm focus:ring-glory-500">
+                                    <label class="inline-flex cursor-pointer items-center gap-3 text-sm font-semibold text-[#1A1D23]">
+                                        <input type="checkbox" class="sr-only" x-model="youtubeAsShort">
+                                        <span class="check-box" :class="youtubeAsShort ? 'check-box-on' : ''">
+                                            <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                                <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+                                            </svg>
+                                        </span>
                                         Publish as YouTube Short (adds #Shorts to title)
                                     </label>
                                 </section>
@@ -233,25 +244,25 @@
                                 </section>
 
                                 {{-- Publish bar --}}
-                                <div class="sticky bottom-4 z-10 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#E4D9D1] bg-white/95 px-5 py-4 shadow-[0_12px_40px_-16px_rgba(107,44,62,0.35)] backdrop-blur">
+                                <div class="sticky bottom-4 z-10 flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-glory-500 bg-glory-500 px-5 py-4 text-white shadow-[0_12px_40px_-12px_rgba(107,44,62,0.55)]">
                                     <div class="min-w-0">
-                                        <p class="text-sm font-semibold text-[#1A1D23]">
+                                        <p class="text-sm font-semibold text-white">
                                             Ready to publish
                                         </p>
-                                        <p class="text-xs text-[#8B8680]" x-text="selected.length + ' account' + (selected.length === 1 ? '' : 's') + ' selected'"></p>
+                                        <p class="text-xs text-glory-100" x-text="selected.length + ' account' + (selected.length === 1 ? '' : 's') + ' selected'"></p>
                                     </div>
-                                    <x-primary-button type="submit" x-bind:disabled="publishing">
+                                    <button type="submit" class="inline-flex items-center justify-center rounded-full bg-white px-5 py-2.5 text-[15px] font-semibold text-glory-700 shadow-sm transition hover:bg-glory-50 disabled:cursor-not-allowed disabled:opacity-60" x-bind:disabled="publishing">
                                         <span x-show="!publishing">{{ __('Publish now') }}</span>
                                         <span x-show="publishing" x-cloak>Publishing…</span>
-                                    </x-primary-button>
+                                    </button>
                                 </div>
                             </form>
 
-                            <div x-show="statuses.length" x-cloak class="section-card space-y-3 bg-[#FAF8F6]">
+                            <div x-show="statuses.length" x-cloak class="section-card space-y-3 bg-[#EFE5DC]">
                                 <div class="text-sm font-semibold text-[#1A1D23]">Publish status</div>
                                 <ul class="space-y-2">
                                     <template x-for="item in statuses" :key="item.id">
-                                        <li class="flex items-start justify-between gap-3 rounded-xl border border-[#E4D9D1] bg-white px-4 py-3 text-sm">
+                                        <li class="flex items-start justify-between gap-3 rounded-xl border border-[#C9B8AD] bg-[#FFFCF9] px-4 py-3 text-sm">
                                             <div>
                                                 <span class="font-semibold text-[#1A1D23]" x-text="item.label"></span>
                                                 <span class="text-[#8B8680]"> — <span x-text="item.name"></span></span>

@@ -9,10 +9,10 @@
 
     body {
         @apply text-[#1A1D23] antialiased;
-        background-color: #f7f3f0;
+        background-color: #ebe3dc;
         background-image:
-            radial-gradient(ellipse 90% 55% at 50% -15%, rgba(107, 44, 62, 0.09), transparent 55%),
-            radial-gradient(ellipse 50% 40% at 100% 0%, rgba(107, 44, 62, 0.04), transparent 50%);
+            radial-gradient(ellipse 90% 55% at 50% -15%, rgba(107, 44, 62, 0.14), transparent 55%),
+            radial-gradient(ellipse 55% 45% at 100% 0%, rgba(107, 44, 62, 0.08), transparent 50%);
     }
 
     input[type='text'],
@@ -24,11 +24,11 @@
     input[type='url'],
     textarea,
     select {
-        @apply bg-white text-[#1A1D23] border-[#D6CBC3] placeholder:text-[#8B8680] rounded-xl shadow-sm;
+        @apply bg-[#FFFCF9] text-[#1A1D23] border-[#C9B8AD] placeholder:text-[#8B8680] rounded-xl shadow-sm;
     }
 
     input[type='file'] {
-        @apply w-full cursor-pointer rounded-xl border border-dashed border-[#D6CBC3] bg-[#FAF8F6] px-4 py-4 text-sm font-medium text-[#5C534C];
+        @apply w-full cursor-pointer rounded-xl border border-dashed border-[#C9B8AD] bg-[#F3EBE4] px-4 py-4 text-sm font-medium text-[#5C534C];
     }
 
     input[type='file']::file-selector-button {
@@ -37,21 +37,26 @@
 
     input[type='checkbox'],
     input[type='radio'] {
-        @apply border-[#C4B8B0] bg-white text-glory-500 focus:ring-glory-500 focus:ring-offset-[#f7f3f0];
+        @apply h-5 w-5 shrink-0 rounded border-2 border-[#8B7A70] bg-[#FFFCF9] text-glory-500 accent-glory-500 focus:ring-2 focus:ring-glory-500 focus:ring-offset-2 focus:ring-offset-[#ebe3dc];
+    }
+
+    input[type='checkbox']:checked,
+    input[type='radio']:checked {
+        @apply border-glory-500 bg-glory-500;
     }
 }
 
 @layer components {
     .btn-primary {
-        @apply inline-flex items-center justify-center gap-2 rounded-full bg-glory-500 px-5 py-2.5 text-[15px] font-semibold leading-none text-white shadow-[0_8px_20px_-10px_rgba(107,44,62,0.65)] transition hover:bg-glory-600 hover:shadow-[0_10px_24px_-10px_rgba(107,44,62,0.8)] focus:outline-none focus:ring-2 focus:ring-glory-500 focus:ring-offset-2 focus:ring-offset-[#f7f3f0] disabled:cursor-not-allowed disabled:opacity-60;
+        @apply inline-flex items-center justify-center gap-2 rounded-full bg-glory-500 px-5 py-2.5 text-[15px] font-semibold leading-none text-white shadow-[0_8px_20px_-10px_rgba(107,44,62,0.65)] transition hover:bg-glory-600 hover:shadow-[0_10px_24px_-10px_rgba(107,44,62,0.8)] focus:outline-none focus:ring-2 focus:ring-glory-500 focus:ring-offset-2 focus:ring-offset-[#ebe3dc] disabled:cursor-not-allowed disabled:opacity-60;
     }
 
     .btn-secondary {
-        @apply inline-flex items-center justify-center gap-2 rounded-full border border-[#D6CBC3] bg-white/80 px-5 py-2.5 text-[15px] font-semibold leading-none text-[#1A1D23] transition hover:border-[#C4B8B0] hover:bg-white focus:outline-none focus:ring-2 focus:ring-glory-500/20 focus:ring-offset-2 focus:ring-offset-[#f7f3f0];
+        @apply inline-flex items-center justify-center gap-2 rounded-full border border-[#C9B8AD] bg-[#F7EFE8] px-5 py-2.5 text-[15px] font-semibold leading-none text-[#1A1D23] transition hover:border-glory-300 hover:bg-[#FFFCF9] focus:outline-none focus:ring-2 focus:ring-glory-500/20 focus:ring-offset-2 focus:ring-offset-[#ebe3dc];
     }
 
     .btn-ghost {
-        @apply inline-flex items-center justify-center gap-2 rounded-full px-3.5 py-2 text-sm font-semibold text-[#5C534C] transition hover:bg-glory-50 hover:text-glory-700 focus:outline-none focus:ring-2 focus:ring-glory-500/15;
+        @apply inline-flex items-center justify-center gap-2 rounded-full px-3.5 py-2 text-sm font-semibold text-[#5C534C] transition hover:bg-glory-100 hover:text-glory-700 focus:outline-none focus:ring-2 focus:ring-glory-500/15;
     }
 
     .btn-danger-ghost {
@@ -59,15 +64,15 @@
     }
 
     .panel {
-        @apply overflow-hidden rounded-2xl border border-[#E4D9D1] bg-white/95 shadow-[0_1px_2px_rgba(26,29,35,0.04),0_20px_48px_-28px_rgba(107,44,62,0.22)];
+        @apply overflow-hidden rounded-2xl border border-[#D4C3B8] bg-[#F7EFE8] shadow-[0_1px_2px_rgba(26,29,35,0.05),0_20px_48px_-28px_rgba(107,44,62,0.28)];
     }
 
     .panel-soft {
-        @apply overflow-hidden rounded-2xl border border-[#E4D9D1] bg-[#FAF8F6]/90;
+        @apply overflow-hidden rounded-2xl border border-[#D4C3B8] bg-[#EFE5DC];
     }
 
     .kicker {
-        @apply text-[11px] font-semibold uppercase tracking-[0.22em] text-glory-500;
+        @apply text-[11px] font-semibold uppercase tracking-[0.22em] text-glory-600;
     }
 
     .field-label {
@@ -75,19 +80,19 @@
     }
 
     .field-hint {
-        @apply mt-1.5 text-xs leading-relaxed text-[#8B8680];
+        @apply mt-1.5 text-xs leading-relaxed text-[#6F655C];
     }
 
     .field-input {
-        @apply mt-2 block w-full rounded-xl border-[#D6CBC3] bg-white text-[#1A1D23] shadow-sm placeholder:text-[#8B8680] focus:border-glory-500 focus:ring-glory-500;
+        @apply mt-2 block w-full rounded-xl border-[#C9B8AD] bg-[#FFFCF9] text-[#1A1D23] shadow-sm placeholder:text-[#8B8680] focus:border-glory-500 focus:ring-glory-500;
     }
 
     .section-card {
-        @apply rounded-2xl border border-[#E4D9D1] bg-white p-5 sm:p-6;
+        @apply rounded-2xl border border-[#D4C3B8] bg-[#F3EBE4] p-5 sm:p-6;
     }
 
     .page-header {
-        @apply border-b border-[#E4D9D1] bg-gradient-to-b from-white via-white to-[#faf6f3];
+        @apply border-b border-[#D4C3B8] bg-gradient-to-b from-[#F7EFE8] via-[#F3EBE4] to-[#ebe3dc];
     }
 
     .status-dot {
@@ -95,10 +100,30 @@
     }
 
     .dropzone {
-        @apply relative flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-[#D6CBC3] bg-[#FAF8F6] px-4 py-8 text-center transition hover:border-glory-300 hover:bg-glory-50/40;
+        @apply relative flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-[#C9B8AD] bg-[#EFE5DC] px-4 py-8 text-center transition hover:border-glory-400 hover:bg-glory-100/50;
     }
 
     .dropzone-active {
-        @apply border-glory-400 bg-glory-50/60;
+        @apply border-glory-500 bg-glory-100;
+    }
+
+    .check-box {
+        @apply flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2 border-[#8B7A70] bg-[#FFFCF9] text-transparent transition;
+    }
+
+    .check-box-on {
+        @apply border-glory-500 bg-glory-500 text-white shadow-[0_0_0_3px_rgba(107,44,62,0.18)];
+    }
+
+    .account-tile {
+        @apply relative flex cursor-pointer items-start gap-3 overflow-hidden rounded-2xl border-2 px-4 py-4 transition;
+    }
+
+    .account-tile-off {
+        @apply border-[#C9B8AD] bg-[#FFFCF9] hover:border-glory-300 hover:bg-[#F7EFE8];
+    }
+
+    .account-tile-on {
+        @apply border-glory-500 bg-glory-100 shadow-[0_0_0_1px_#6B2C3E,0_10px_28px_-16px_rgba(107,44,62,0.55)];
     }
 }

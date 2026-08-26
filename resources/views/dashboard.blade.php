@@ -121,7 +121,7 @@
                     <div class="kicker">Status</div>
                     <div class="mt-3 flex flex-wrap gap-2">
                         @foreach ($platforms as $p)
-                            <span class="inline-flex items-center gap-2 rounded-full border border-[#E4D9D1] bg-[#FAF8F6] px-3 py-1.5 text-xs font-semibold text-[#5C534C]">
+                            <span class="inline-flex items-center gap-2 rounded-full border border-[#C9B8AD] bg-[#FFFCF9] px-3 py-1.5 text-xs font-semibold text-[#5C534C]">
                                 <span class="status-dot {{ $p['connected'] ? 'bg-emerald-500' : 'bg-[#C4B8B0]' }}"></span>
                                 {{ $p['label'] }}
                             </span>
@@ -134,7 +134,7 @@
                 @foreach ($platforms as $p)
                     <section class="panel relative overflow-hidden">
                         <div class="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b {{ $p['accentSoft'] }}"></div>
-                        <div class="relative flex items-start justify-between gap-4 border-b border-[#E4D9D1] px-6 py-5">
+                        <div class="relative flex items-start justify-between gap-4 border-b border-[#D4C3B8] px-6 py-5">
                             <div class="flex min-w-0 items-start gap-3">
                                 <div class="mt-0.5 flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl {{ $p['accent'] }} text-sm font-bold text-white shadow-soft ring-4 ring-white/70">
                                     @if ($p['key'] === 'facebook') f
@@ -179,25 +179,25 @@
 
                         <div class="relative px-6 py-4">
                             @if ($p['accounts']->isEmpty())
-                                <div class="flex flex-col items-start gap-3 rounded-xl border border-dashed border-[#D6CBC3] bg-[#FAF8F6]/80 px-4 py-6">
+                                <div class="flex flex-col items-start gap-3 rounded-xl border border-dashed border-[#C9B8AD] bg-[#EFE5DC] px-4 py-6">
                                     <p class="text-sm text-[#5C534C]">{{ $p['empty'] }}</p>
                                     <a href="{{ $p['connect'] }}" class="btn-primary">{{ $p['connectLabel'] }}</a>
                                 </div>
                             @else
-                                <ul class="divide-y divide-[#EDE4DD]">
+                                <ul class="divide-y divide-[#DCCFCO]">
                                     @foreach ($p['accounts'] as $account)
                                         <li class="flex items-center justify-between gap-3 py-3.5">
                                             <div class="flex min-w-0 items-center gap-3">
                                                 @if ($account->picture_url)
-                                                    <img src="{{ $account->picture_url }}" alt="" class="h-10 w-10 rounded-full object-cover ring-2 ring-white shadow-sm">
+                                                    <img src="{{ $account->picture_url }}" alt="" class="h-10 w-10 rounded-full object-cover ring-2 ring-[#F7EFE8] shadow-sm">
                                                 @else
-                                                    <div class="flex h-10 w-10 items-center justify-center rounded-full bg-glory-50 text-sm font-semibold text-glory-700 ring-2 ring-white shadow-sm">
+                                                    <div class="flex h-10 w-10 items-center justify-center rounded-full bg-glory-100 text-sm font-semibold text-glory-700 ring-2 ring-[#F7EFE8] shadow-sm">
                                                         {{ strtoupper(substr($account->name, 0, 1)) }}
                                                     </div>
                                                 @endif
                                                 <div class="min-w-0">
                                                     <div class="truncate font-semibold text-[#1A1D23]">{{ $account->name }}</div>
-                                                    <div class="truncate text-xs text-[#8B8680]">
+                                                    <div class="truncate text-xs text-[#6F655C]">
                                                         @if ($p['key'] === 'facebook')
                                                             {{ $account->category ?: 'Facebook Page' }}
                                                         @else
