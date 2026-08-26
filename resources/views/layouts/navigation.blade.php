@@ -1,5 +1,5 @@
-<nav x-data="{ open: false }" class="sticky top-0 z-40 border-b border-[#E8E1DB] bg-white/90 backdrop-blur-xl">
-    <div class="h-[3px] bg-glory-500"></div>
+<nav x-data="{ open: false }" class="sticky top-0 z-40 border-b border-[#E4D9D1] bg-white/90 backdrop-blur-xl">
+    <div class="h-[3px] bg-gradient-to-r from-glory-700 via-glory-500 to-glory-400"></div>
     <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div class="flex h-[4.25rem] items-center justify-between">
             <div class="flex items-center gap-10">
