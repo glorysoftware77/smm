@@ -184,7 +184,7 @@
                                     <a href="{{ $p['connect'] }}" class="btn-primary">{{ $p['connectLabel'] }}</a>
                                 </div>
                             @else
-                                <ul class="divide-y divide-[#DCCFCO]">
+                                <ul class="divide-y divide-[#D4C3B8]">
                                     @foreach ($p['accounts'] as $account)
                                         <li class="flex items-center justify-between gap-3 py-3.5">
                                             <div class="flex min-w-0 items-center gap-3">
