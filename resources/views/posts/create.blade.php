@@ -8,6 +8,7 @@
             'instagram' => 'Instagram',
             'youtube' => 'YouTube',
             'tiktok' => 'TikTok',
+            'linkedin' => 'LinkedIn',
             default => ucfirst($page->provider),
         },
     ])->values();
@@ -35,7 +36,7 @@
                         <div class="flex flex-col items-start gap-4 rounded-2xl border border-dashed border-[#C9B8AD] bg-[#EFE5DC] px-5 py-10">
                             <p class="kicker">Get started</p>
                             <p class="max-w-md text-sm leading-relaxed text-[#5C534C]">
-                                Connect Facebook, Instagram, YouTube, or TikTok first from the Dashboard before composing a post.
+                                Connect Facebook, Instagram, YouTube, TikTok, or LinkedIn first from the Dashboard before composing a post.
                             </p>
                             <a href="{{ route('dashboard') }}" class="btn-primary">Go to Dashboard</a>
                         </div>
@@ -68,6 +69,7 @@
                                                           'bg-gradient-to-b from-[#F58529] via-[#DD2A7B] to-[#8134AF]': page.provider === 'instagram',
                                                           'bg-[#FF0000]': page.provider === 'youtube',
                                                           'bg-[#1A1D23]': page.provider === 'tiktok',
+                                                          'bg-[#0A66C2]': page.provider === 'linkedin',
                                                       }"></span>
                                                 <input type="checkbox"
                                                        class="sr-only"
@@ -87,8 +89,9 @@
                                                                   'bg-gradient-to-br from-[#F58529] via-[#DD2A7B] to-[#8134AF]': page.provider === 'instagram',
                                                                   'bg-[#FF0000]': page.provider === 'youtube',
                                                                   'bg-[#1A1D23]': page.provider === 'tiktok',
+                                                                  'bg-[#0A66C2]': page.provider === 'linkedin',
                                                               }"
-                                                              x-text="page.provider === 'facebook' ? 'f' : (page.provider === 'instagram' ? 'Ig' : (page.provider === 'youtube' ? '▶' : 'TT'))"></span>
+                                                              x-text="page.provider === 'facebook' ? 'f' : (page.provider === 'instagram' ? 'Ig' : (page.provider === 'youtube' ? '▶' : (page.provider === 'linkedin' ? 'in' : 'TT')))"></span>
                                                         <span class="text-sm font-semibold" x-text="page.label"></span>
                                                         <span class="ml-auto rounded-full bg-glory-500 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white"
                                                               x-show="selected.includes(String(page.id))"
@@ -101,7 +104,7 @@
                                     </div>
 
                                     <p class="field-hint !mt-0">
-                                        FB videos → Reels. IG needs image/video. YouTube &amp; TikTok need video.
+                                        FB videos → Reels. IG needs image/video. YouTube &amp; TikTok need video. LinkedIn supports text, image, or video.
                                     </p>
                                     <p x-show="error && !statuses.length" class="text-sm text-red-600" x-text="error"></p>
                                 </section>
@@ -148,7 +151,7 @@
                                         <textarea id="description" name="description" rows="7" x-model="description"
                                                   class="field-input"
                                                   placeholder="Write your post… emojis and line breaks are kept."></textarea>
-                                        <p class="field-hint">Used for Facebook, Instagram, and YouTube.</p>
+                                        <p class="field-hint">Used for Facebook, Instagram, YouTube, and LinkedIn.</p>
                                     </div>
 
                                     <div>
@@ -156,7 +159,7 @@
                                         <textarea id="hashtags" name="hashtags" rows="2" x-model="hashtags"
                                                   class="field-input"
                                                   placeholder="#YourBrand #Topic"></textarea>
-                                        <p class="field-hint">Appended under the caption for Instagram, Facebook, and YouTube.</p>
+                                        <p class="field-hint">Appended under the caption for Instagram, Facebook, YouTube, and LinkedIn.</p>
                                     </div>
                                 </section>
 
@@ -398,6 +401,10 @@
                         }
                         if (targets.some(p => p.provider === 'facebook') && !this.composedMessage && !this.imageFile && !this.videoFile) {
                             this.error = 'Facebook needs text, an image, or a video.';
+                            return;
+                        }
+                        if (targets.some(p => p.provider === 'linkedin') && !this.composedMessage && !this.imageFile && !this.videoFile) {
+                            this.error = 'LinkedIn needs text, an image, or a video.';
                             return;
                         }
 

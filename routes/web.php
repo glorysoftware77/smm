@@ -4,6 +4,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FacebookConnectController;
 use App\Http\Controllers\InsightsController;
 use App\Http\Controllers\InstagramConnectController;
+use App\Http\Controllers\LinkedInConnectController;
 use App\Http\Controllers\PostController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\TikTokConnectController;
@@ -46,6 +47,12 @@ Route::middleware('auth')->group(function () {
     Route::get('/tiktok/redirect', [TikTokConnectController::class, 'redirect'])->name('tiktok.redirect');
     Route::get('/tiktok/callback', [TikTokConnectController::class, 'callback'])->name('tiktok.callback');
     Route::delete('/tiktok/disconnect', [TikTokConnectController::class, 'disconnectAccount'])->name('tiktok.disconnect');
+
+    Route::get('/linkedin/redirect', [LinkedInConnectController::class, 'redirect'])->name('linkedin.redirect');
+    Route::get('/linkedin/callback', [LinkedInConnectController::class, 'callback'])->name('linkedin.callback');
+    Route::post('/linkedin/sync', [LinkedInConnectController::class, 'syncPages'])->name('linkedin.sync');
+    Route::delete('/linkedin/pages/{page}', [LinkedInConnectController::class, 'disconnectPage'])->name('linkedin.pages.disconnect');
+    Route::delete('/linkedin/disconnect', [LinkedInConnectController::class, 'disconnectAccount'])->name('linkedin.disconnect');
 
     Route::get('/posts/create', [PostController::class, 'create'])->name('posts.create');
     Route::post('/posts/generate', [PostController::class, 'generate'])->name('posts.generate');

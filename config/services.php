@@ -60,6 +60,17 @@ return [
         'redirect' => env('TIKTOK_REDIRECT_URI', env('APP_URL').'/tiktok/callback'),
     ],
 
+    /*
+    | Community Management / Communication API app (page posting).
+    | Must be a dedicated LinkedIn app with only the Community Management product.
+    */
+    'linkedin' => [
+        'client_id' => env('LINKEDIN_CLIENT_ID'),
+        'client_secret' => env('LINKEDIN_CLIENT_SECRET'),
+        'redirect' => env('LINKEDIN_REDIRECT_URI', env('APP_URL').'/linkedin/callback'),
+        'api_version' => env('LINKEDIN_API_VERSION', '202608'),
+    ],
+
     'gemini' => [
         'api_key' => env('GEMINI_API_KEY'),
         'model' => env('GEMINI_MODEL', 'gemini-2.0-flash'),

@@ -16,6 +16,7 @@
             'disconnect' => route('facebook.disconnect'),
             'disconnectConfirm' => 'Disconnect Facebook and all linked pages?',
             'canRemove' => true,
+            'removeRoute' => 'facebook.pages.disconnect',
             'empty' => 'No Facebook Pages connected yet.',
         ],
         [
@@ -34,6 +35,7 @@
             'disconnect' => route('instagram.disconnect'),
             'disconnectConfirm' => 'Disconnect Instagram?',
             'canRemove' => true,
+            'removeRoute' => 'facebook.pages.disconnect',
             'empty' => 'No Instagram accounts linked yet.',
         ],
         [
@@ -52,6 +54,7 @@
             'disconnect' => route('youtube.disconnect'),
             'disconnectConfirm' => 'Disconnect YouTube?',
             'canRemove' => false,
+            'removeRoute' => null,
             'empty' => 'No YouTube channels linked yet.',
         ],
         [
@@ -70,7 +73,27 @@
             'disconnect' => route('tiktok.disconnect'),
             'disconnectConfirm' => 'Disconnect TikTok?',
             'canRemove' => false,
+            'removeRoute' => null,
             'empty' => 'No TikTok accounts linked yet.',
+        ],
+        [
+            'key' => 'linkedin',
+            'label' => 'LinkedIn',
+            'hint' => 'Company Pages',
+            'connected' => $hasLinkedInAccount,
+            'accounts' => $linkedinPages,
+            'count' => $linkedinPages->count(),
+            'accent' => 'bg-[#0A66C2]',
+            'accentSoft' => 'from-[#0A66C2]/12 to-transparent',
+            'connect' => route('linkedin.redirect'),
+            'connectLabel' => $hasLinkedInAccount ? 'Reconnect' : 'Connect',
+            'showRefresh' => $hasLinkedInAccount,
+            'refresh' => route('linkedin.sync'),
+            'disconnect' => route('linkedin.disconnect'),
+            'disconnectConfirm' => 'Disconnect LinkedIn and all linked pages?',
+            'canRemove' => true,
+            'removeRoute' => 'linkedin.pages.disconnect',
+            'empty' => 'No LinkedIn Pages connected yet.',
         ],
     ];
 
@@ -111,7 +134,7 @@
             <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
                 <div class="panel px-5 py-5">
                     <div class="kicker">Networks</div>
-                    <div class="mt-3 text-3xl font-semibold tracking-tight text-[#1A1D23]">{{ $connectedCount }}<span class="text-lg font-normal text-[#8B8680]"> / 4</span></div>
+                    <div class="mt-3 text-3xl font-semibold tracking-tight text-[#1A1D23]">{{ $connectedCount }}<span class="text-lg font-normal text-[#8B8680]"> / 5</span></div>
                 </div>
                 <div class="panel px-5 py-5">
                     <div class="kicker">Profiles</div>
@@ -140,6 +163,7 @@
                                     @if ($p['key'] === 'facebook') f
                                     @elseif ($p['key'] === 'instagram') Ig
                                     @elseif ($p['key'] === 'youtube') ▶
+                                    @elseif ($p['key'] === 'linkedin') in
                                     @else TT
                                     @endif
                                 </div>
@@ -198,8 +222,8 @@
                                                 <div class="min-w-0">
                                                     <div class="truncate font-semibold text-[#1A1D23]">{{ $account->name }}</div>
                                                     <div class="truncate text-xs text-[#6F655C]">
-                                                        @if ($p['key'] === 'facebook')
-                                                            {{ $account->category ?: 'Facebook Page' }}
+                                                        @if (in_array($p['key'], ['facebook', 'linkedin'], true))
+                                                            {{ $account->category ?: ($p['key'] === 'linkedin' ? 'LinkedIn Page' : 'Facebook Page') }}
                                                         @else
                                                             {{ $p['label'] }}
                                                         @endif
@@ -208,8 +232,8 @@
                                                 </div>
                                             </div>
 
-                                            @if ($p['canRemove'])
-                                                <form method="POST" action="{{ route('facebook.pages.disconnect', $account) }}">
+                                            @if ($p['canRemove'] && $p['removeRoute'])
+                                                <form method="POST" action="{{ route($p['removeRoute'], $account) }}">
                                                     @csrf
                                                     @method('DELETE')
                                                     <button type="submit" class="btn-danger-ghost">Remove</button>

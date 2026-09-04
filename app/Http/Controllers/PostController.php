@@ -8,6 +8,7 @@ use App\Models\SocialPage;
 use App\Services\FacebookService;
 use App\Services\GeminiService;
 use App\Services\InstagramService;
+use App\Services\LinkedInService;
 use App\Services\TikTokService;
 use App\Services\YouTubeService;
 use Illuminate\Http\JsonResponse;
@@ -25,7 +26,7 @@ class PostController extends Controller
     {
         $pages = $request->user()
             ->socialPages()
-            ->whereIn('provider', ['facebook', 'instagram', 'youtube', 'tiktok'])
+            ->whereIn('provider', ['facebook', 'instagram', 'youtube', 'tiktok', 'linkedin'])
             ->where('is_connected', true)
             ->orderBy('provider')
             ->orderBy('name')
@@ -41,13 +42,13 @@ class PostController extends Controller
         $validated = $request->validate([
             'prompt' => ['required', 'string', 'max:2000'],
             'platforms' => ['nullable', 'array'],
-            'platforms.*' => ['in:facebook,instagram,youtube,tiktok'],
+            'platforms.*' => ['in:facebook,instagram,youtube,tiktok,linkedin'],
         ]);
 
-        $platforms = $validated['platforms'] ?? ['facebook', 'instagram', 'youtube'];
+        $platforms = $validated['platforms'] ?? ['facebook', 'instagram', 'youtube', 'linkedin'];
 
         if ($platforms === []) {
-            $platforms = ['facebook', 'instagram', 'youtube'];
+            $platforms = ['facebook', 'instagram', 'youtube', 'linkedin'];
         }
 
         try {
@@ -77,7 +78,8 @@ class PostController extends Controller
         FacebookService $facebook,
         InstagramService $instagram,
         YouTubeService $youtube,
-        TikTokService $tiktok
+        TikTokService $tiktok,
+        LinkedInService $linkedin
     ): JsonResponse|RedirectResponse {
         $validated = $request->validate([
             'social_page_id' => ['required', 'exists:social_pages,id'],
@@ -118,6 +120,10 @@ class PostController extends Controller
             return $this->fail($request, 'Add text, an image, or a video before publishing.');
         }
 
+        if ($page->provider === 'linkedin' && ! $hasMessage && $mediaType === 'none') {
+            return $this->fail($request, 'Add text, an image, or a video before publishing to LinkedIn.');
+        }
+
         $postFormat = match (true) {
             $page->provider === 'youtube' && $mediaType === 'video' => $request->boolean('youtube_as_short') ? 'short' : 'video',
             $page->provider === 'tiktok' && $mediaType === 'video' => 'video',
@@ -141,6 +147,7 @@ class PostController extends Controller
             'instagram' => 'Instagram',
             'youtube' => 'YouTube',
             'tiktok' => 'TikTok',
+            'linkedin' => 'LinkedIn',
             default => ucfirst($page->provider),
         };
 
@@ -154,7 +161,8 @@ class PostController extends Controller
                 $facebook,
                 $instagram,
                 $youtube,
-                $tiktok
+                $tiktok,
+                $linkedin
             );
 
             $post->update([
@@ -246,8 +254,43 @@ class PostController extends Controller
         FacebookService $facebook,
         InstagramService $instagram,
         YouTubeService $youtube,
-        TikTokService $tiktok
+        TikTokService $tiktok,
+        LinkedInService $linkedin
     ): array {
+        if ($page->provider === 'linkedin') {
+            $accessToken = $linkedin->resolveAccessToken($page);
+            $message = $validated['message'] ?? '';
+            $title = $validated['title'] ?? null;
+
+            if ($mediaType === 'video') {
+                $result = $linkedin->publishVideoPost(
+                    $page->page_id,
+                    $accessToken,
+                    Storage::disk('public')->path($mediaPath),
+                    $message !== '' ? $message : null,
+                    $title
+                );
+
+                return [$result['id'] ?? null, null];
+            }
+
+            if ($mediaType === 'image') {
+                $result = $linkedin->publishImagePost(
+                    $page->page_id,
+                    $accessToken,
+                    Storage::disk('public')->path($mediaPath),
+                    $message !== '' ? $message : null,
+                    $title
+                );
+
+                return [$result['id'] ?? null, null];
+            }
+
+            $result = $linkedin->publishTextPost($page->page_id, $accessToken, (string) $message);
+
+            return [$result['id'] ?? null, null];
+        }
+
         if ($page->provider === 'tiktok') {
             $accessToken = $tiktok->resolveAccessToken($page);
             $absolutePath = Storage::disk('public')->path($mediaPath);
