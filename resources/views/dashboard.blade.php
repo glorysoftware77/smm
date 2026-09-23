@@ -79,7 +79,7 @@
         [
             'key' => 'linkedin',
             'label' => 'LinkedIn',
-            'hint' => filled(config('services.zernio.api_key')) ? 'via Zernio' : 'Company Pages',
+            'hint' => 'via Zernio (required)',
             'connected' => $hasLinkedInAccount,
             'accounts' => $linkedinPages,
             'count' => $linkedinPages->count(),

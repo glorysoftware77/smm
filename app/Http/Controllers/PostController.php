@@ -265,46 +265,20 @@ class PostController extends Controller
             $message = $validated['message'] ?? '';
             $title = $validated['title'] ?? null;
 
-            if ($zernio->isConfigured()) {
-                $absolutePath = $mediaPath ? Storage::disk('public')->path($mediaPath) : null;
-                $result = $zernio->publishLinkedInPost(
-                    $page->page_id,
-                    (string) $message,
-                    $absolutePath,
-                    $mediaType === 'none' ? null : $mediaType,
-                    $title
+            if (! $zernio->isConfigured()) {
+                throw new \RuntimeException(
+                    'LinkedIn Direct API is not approved yet. Add ZERNIO_API_KEY to .env to publish via Zernio.'
                 );
-
-                return [$result['id'] ?? null, null];
             }
 
-            $accessToken = $linkedin->resolveAccessToken($page);
-
-            if ($mediaType === 'video') {
-                $result = $linkedin->publishVideoPost(
-                    $page->page_id,
-                    $accessToken,
-                    Storage::disk('public')->path($mediaPath),
-                    $message !== '' ? $message : null,
-                    $title
-                );
-
-                return [$result['id'] ?? null, null];
-            }
-
-            if ($mediaType === 'image') {
-                $result = $linkedin->publishImagePost(
-                    $page->page_id,
-                    $accessToken,
-                    Storage::disk('public')->path($mediaPath),
-                    $message !== '' ? $message : null,
-                    $title
-                );
-
-                return [$result['id'] ?? null, null];
-            }
-
-            $result = $linkedin->publishTextPost($page->page_id, $accessToken, (string) $message);
+            $absolutePath = $mediaPath ? Storage::disk('public')->path($mediaPath) : null;
+            $result = $zernio->publishLinkedInPost(
+                $page->page_id,
+                (string) $message,
+                $absolutePath,
+                $mediaType === 'none' ? null : $mediaType,
+                $title
+            );
 
             return [$result['id'] ?? null, null];
         }

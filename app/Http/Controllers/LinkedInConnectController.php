@@ -16,19 +16,26 @@ class LinkedInConnectController extends Controller
 {
     public function redirect(Request $request, LinkedInService $linkedin, ZernioService $zernio): RedirectResponse
     {
-        if ($zernio->isConfigured()) {
-            return $this->redirectViaZernio($request, $zernio);
+        // LinkedIn Direct org scopes are not approved yet — only Zernio can connect Pages.
+        if (! $zernio->isConfigured()) {
+            return redirect()
+                ->route('dashboard')
+                ->with('error', 'LinkedIn Direct API is not approved yet. Add ZERNIO_API_KEY to your .env, then click Connect again.');
         }
 
-        $state = $linkedin->generateState();
-        $request->session()->put('linkedin_oauth_state', $state);
-
-        return redirect()->away($linkedin->authorizationUrl($state));
+        return $this->redirectViaZernio($request, $zernio);
     }
 
     public function callback(Request $request, LinkedInService $linkedin, ZernioService $zernio): RedirectResponse
     {
-        if ($zernio->isConfigured() && ($request->filled('connected') || $request->filled('accountId'))) {
+        // Zernio returns connected / accountId query params after OAuth.
+        if ($request->filled('connected') || $request->filled('accountId') || $request->filled('profileId')) {
+            if (! $zernio->isConfigured()) {
+                return redirect()
+                    ->route('dashboard')
+                    ->with('error', 'ZERNIO_API_KEY is missing. Add it to .env before connecting LinkedIn.');
+            }
+
             return $this->callbackViaZernio($request, $zernio);
         }
 
@@ -36,6 +43,13 @@ class LinkedInConnectController extends Controller
             return redirect()
                 ->route('dashboard')
                 ->with('error', 'LinkedIn connection cancelled: '.$request->string('error_description', $request->string('error')));
+        }
+
+        // Legacy Direct LinkedIn OAuth callback (only if explicitly enabled after approval).
+        if (! filter_var(config('services.linkedin.use_direct'), FILTER_VALIDATE_BOOLEAN)) {
+            return redirect()
+                ->route('dashboard')
+                ->with('error', 'LinkedIn Direct connect is disabled. Use Zernio (set ZERNIO_API_KEY).');
         }
 
         $state = $request->session()->pull('linkedin_oauth_state');
@@ -103,51 +117,13 @@ class LinkedInConnectController extends Controller
 
     public function syncPages(Request $request, LinkedInService $linkedin, ZernioService $zernio): RedirectResponse
     {
-        if ($zernio->isConfigured()) {
-            return $this->syncViaZernio($request, $zernio);
+        if (! $zernio->isConfigured()) {
+            return redirect()
+                ->route('dashboard')
+                ->with('error', 'Add ZERNIO_API_KEY to .env to sync LinkedIn Pages.');
         }
 
-        $account = SocialAccount::query()
-            ->where('user_id', $request->user()->id)
-            ->where('provider', 'linkedin')
-            ->latest()
-            ->first();
-
-        if (! $account) {
-            return redirect()->route('dashboard')->with('error', 'Connect LinkedIn first.');
-        }
-
-        try {
-            $accessToken = $account->access_token;
-
-            if ($account->refresh_token && $account->token_expires_at?->isBefore(now()->addMinutes(5))) {
-                $refreshed = $linkedin->refreshAccessToken($account->refresh_token);
-                $accessToken = $refreshed['access_token'];
-                $account->update([
-                    'access_token' => $accessToken,
-                    'refresh_token' => $refreshed['refresh_token'] ?? $account->refresh_token,
-                    'token_expires_at' => now()->addSeconds((int) ($refreshed['expires_in'] ?? 5184000)),
-                ]);
-            }
-
-            $pages = $linkedin->resolveOrganizationPages($accessToken);
-
-            DB::transaction(function () use ($request, $account, $accessToken, $pages) {
-                $this->storeLinkedInPages($request->user()->id, $account->id, $accessToken, $pages);
-            });
-        } catch (Throwable $e) {
-            report($e);
-
-            return redirect()->route('dashboard')->with('error', 'Could not refresh LinkedIn pages: '.$e->getMessage());
-        }
-
-        $pageCount = count($pages);
-
-        return redirect()
-            ->route('dashboard')
-            ->with($pageCount > 0 ? 'success' : 'error', $pageCount > 0
-                ? "Synced {$pageCount} LinkedIn Page(s)."
-                : 'No LinkedIn Pages found for this account.');
+        return $this->syncViaZernio($request, $zernio);
     }
 
     public function disconnectPage(Request $request, SocialPage $page): RedirectResponse

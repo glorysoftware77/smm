@@ -69,12 +69,13 @@ return [
         'client_secret' => env('LINKEDIN_CLIENT_SECRET'),
         'redirect' => env('LINKEDIN_REDIRECT_URI', env('APP_URL').'/linkedin/callback'),
         'api_version' => env('LINKEDIN_API_VERSION', '202608'),
+        // Keep false until Community Management Direct API is approved.
+        'use_direct' => env('LINKEDIN_USE_DIRECT', false),
     ],
 
     /*
-    | Zernio social API — temporary LinkedIn Page publish bridge while
-    | LinkedIn Community Management Direct API approval is pending.
-    | When ZERNIO_API_KEY is set, LinkedIn connect + publish use Zernio.
+    | Zernio social API — LinkedIn Page connect + publish bridge.
+    | Required while LinkedIn Direct org scopes are not authorized.
     */
     'zernio' => [
         'api_key' => env('ZERNIO_API_KEY'),
