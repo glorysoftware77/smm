@@ -314,7 +314,6 @@ class LinkedInConnectController extends Controller
 
         $account = SocialAccount::query()
             ->where('user_id', $request->user()->id)
-            ->where('provider', 'linkedin')
             ->where('provider_user_id', 'like', 'zernio:%')
             ->latest()
             ->first();

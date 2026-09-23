@@ -6,6 +6,7 @@ use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use RuntimeException;
+use Throwable;
 
 class ZernioService
 {
@@ -41,9 +42,25 @@ class ZernioService
      */
     public function listLinkedInAccounts(?string $profileId = null): array
     {
+        return $this->listPlatformAccounts('linkedin', $profileId);
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function listTikTokAccounts(?string $profileId = null): array
+    {
+        return $this->listPlatformAccounts('tiktok', $profileId);
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function listPlatformAccounts(string $platform, ?string $profileId = null): array
+    {
         return array_values(array_filter(
             $this->listAccounts($profileId),
-            fn (array $account): bool => ($account['platform'] ?? null) === 'linkedin'
+            fn (array $account): bool => ($account['platform'] ?? null) === $platform
                 && ($account['isActive'] ?? true)
         ));
     }
@@ -51,7 +68,7 @@ class ZernioService
     /**
      * @return array{id: string, name: string}
      */
-    public function ensureProfile(string $name = 'SMM LinkedIn'): array
+    public function ensureProfile(string $name = 'SMM'): array
     {
         $configuredId = config('services.zernio.profile_id');
 
@@ -140,12 +157,104 @@ class ZernioService
         ?string $mediaType = null,
         ?string $title = null
     ): array {
+        return $this->publishPost('linkedin', $accountId, $content, $mediaPath, $mediaType, $title);
+    }
+
+    /**
+     * Publish a TikTok video via Zernio.
+     *
+     * @return array{id: ?string, url: ?string}
+     */
+    public function publishTikTokPost(
+        string $accountId,
+        string $content,
+        string $videoPath,
+        string $privacyLevel = 'PUBLIC_TO_EVERYONE'
+    ): array {
+        $allowed = [
+            'PUBLIC_TO_EVERYONE',
+            'MUTUAL_FOLLOW_FRIENDS',
+            'FOLLOWER_OF_CREATOR',
+            'SELF_ONLY',
+        ];
+
+        if (! in_array($privacyLevel, $allowed, true)) {
+            $privacyLevel = 'PUBLIC_TO_EVERYONE';
+        }
+
+        $privacyLevel = $this->resolveTikTokPrivacyLevel($accountId, $privacyLevel);
+
+        return $this->publishPost(
+            'tiktok',
+            $accountId,
+            $content,
+            $videoPath,
+            'video',
+            null,
+            [
+                'privacy_level' => $privacyLevel,
+                'allow_comment' => true,
+                'allow_duet' => true,
+                'allow_stitch' => true,
+                'content_preview_confirmed' => true,
+                'express_consent_given' => true,
+            ]
+        );
+    }
+
+    /**
+     * Prefer the requested privacy level when the creator allows it; otherwise first available.
+     */
+    public function resolveTikTokPrivacyLevel(string $accountId, string $preferred): string
+    {
+        try {
+            $response = $this->get('/accounts/'.$accountId.'/tiktok/creator-info', [
+                'mediaType' => 'video',
+            ]);
+
+            if (! $response->successful()) {
+                return $preferred;
+            }
+
+            $levels = collect($response->json('privacyLevels', []))
+                ->pluck('value')
+                ->filter()
+                ->values()
+                ->all();
+
+            if ($levels === []) {
+                return $preferred;
+            }
+
+            if (in_array($preferred, $levels, true)) {
+                return $preferred;
+            }
+
+            return (string) $levels[0];
+        } catch (Throwable) {
+            return $preferred;
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $tiktokSettings
+     * @return array{id: ?string, url: ?string}
+     */
+    public function publishPost(
+        string $platform,
+        string $accountId,
+        string $content,
+        ?string $mediaPath = null,
+        ?string $mediaType = null,
+        ?string $title = null,
+        ?array $tiktokSettings = null
+    ): array {
         $payload = [
             'content' => $content,
             'publishNow' => true,
             'platforms' => [
                 [
-                    'platform' => 'linkedin',
+                    'platform' => $platform,
                     'accountId' => $accountId,
                 ],
             ],
@@ -168,6 +277,10 @@ class ZernioService
             ];
         }
 
+        if ($platform === 'tiktok' && $tiktokSettings !== null) {
+            $payload['tiktokSettings'] = $tiktokSettings;
+        }
+
         $response = Http::withHeaders($this->headers([
             'Content-Type' => 'application/json',
             'x-request-id' => (string) Str::uuid(),
@@ -185,22 +298,22 @@ class ZernioService
         }
 
         if (! in_array($response->status(), [200, 201, 207], true)) {
-            throw new RuntimeException('Failed to publish LinkedIn post via Zernio: '.$response->body());
+            throw new RuntimeException('Failed to publish '.$platform.' post via Zernio: '.$response->body());
         }
 
         $post = $response->json('post') ?? $response->json('existingPost') ?? [];
         $platforms = $post['platforms'] ?? [];
-        $linkedin = collect($platforms)->firstWhere('platform', 'linkedin') ?? ($platforms[0] ?? []);
+        $target = collect($platforms)->firstWhere('platform', $platform) ?? ($platforms[0] ?? []);
 
-        if (($linkedin['status'] ?? null) === 'failed') {
+        if (($target['status'] ?? null) === 'failed') {
             throw new RuntimeException(
-                'Zernio LinkedIn publish failed: '.($linkedin['error'] ?? $response->body())
+                'Zernio '.$platform.' publish failed: '.($target['error'] ?? $response->body())
             );
         }
 
         return [
             'id' => isset($post['_id']) ? (string) $post['_id'] : null,
-            'url' => isset($linkedin['platformPostUrl']) ? (string) $linkedin['platformPostUrl'] : null,
+            'url' => isset($target['platformPostUrl']) ? (string) $target['platformPostUrl'] : null,
         ];
     }
 

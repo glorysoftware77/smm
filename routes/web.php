@@ -46,6 +46,7 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/tiktok/redirect', [TikTokConnectController::class, 'redirect'])->name('tiktok.redirect');
     Route::get('/tiktok/callback', [TikTokConnectController::class, 'callback'])->name('tiktok.callback');
+    Route::post('/tiktok/sync', [TikTokConnectController::class, 'syncAccounts'])->name('tiktok.sync');
     Route::delete('/tiktok/disconnect', [TikTokConnectController::class, 'disconnectAccount'])->name('tiktok.disconnect');
 
     Route::get('/linkedin/redirect', [LinkedInConnectController::class, 'redirect'])->name('linkedin.redirect');

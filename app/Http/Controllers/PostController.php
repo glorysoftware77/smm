@@ -284,18 +284,29 @@ class PostController extends Controller
         }
 
         if ($page->provider === 'tiktok') {
-            $accessToken = $tiktok->resolveAccessToken($page);
-            $absolutePath = Storage::disk('public')->path($mediaPath);
-            $title = $validated['title'] ?: ($validated['message'] ? Str::limit($validated['message'], 140) : 'Untitled');
+            if (! $zernio->isConfigured()) {
+                throw new \RuntimeException(
+                    'Add ZERNIO_API_KEY to .env to publish TikTok via Zernio.'
+                );
+            }
 
-            $result = $tiktok->publishVideo(
-                $accessToken,
+            if ($mediaType !== 'video' || ! $mediaPath) {
+                throw new \RuntimeException('TikTok requires a video file.');
+            }
+
+            $absolutePath = Storage::disk('public')->path($mediaPath);
+            $caption = $validated['title']
+                ?: ($validated['message'] ? Str::limit($validated['message'], 2200) : '');
+            $privacy = $validated['tiktok_privacy'] ?? 'PUBLIC_TO_EVERYONE';
+
+            $result = $zernio->publishTikTokPost(
+                $page->page_id,
+                (string) $caption,
                 $absolutePath,
-                $title,
-                $validated['tiktok_privacy'] ?? 'SELF_ONLY'
+                $privacy
             );
 
-            return [$result['publish_id'] ?? null, null];
+            return [$result['id'] ?? null, null];
         }
 
         if ($page->provider === 'youtube') {
