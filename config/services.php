@@ -71,6 +71,16 @@ return [
         'api_version' => env('LINKEDIN_API_VERSION', '202608'),
     ],
 
+    /*
+    | Zernio social API — temporary LinkedIn Page publish bridge while
+    | LinkedIn Community Management Direct API approval is pending.
+    | When ZERNIO_API_KEY is set, LinkedIn connect + publish use Zernio.
+    */
+    'zernio' => [
+        'api_key' => env('ZERNIO_API_KEY'),
+        'profile_id' => env('ZERNIO_PROFILE_ID'),
+    ],
+
     'gemini' => [
         'api_key' => env('GEMINI_API_KEY'),
         'model' => env('GEMINI_MODEL', 'gemini-2.0-flash'),

@@ -11,6 +11,7 @@ use App\Services\InstagramService;
 use App\Services\LinkedInService;
 use App\Services\TikTokService;
 use App\Services\YouTubeService;
+use App\Services\ZernioService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -79,7 +80,8 @@ class PostController extends Controller
         InstagramService $instagram,
         YouTubeService $youtube,
         TikTokService $tiktok,
-        LinkedInService $linkedin
+        LinkedInService $linkedin,
+        ZernioService $zernio
     ): JsonResponse|RedirectResponse {
         $validated = $request->validate([
             'social_page_id' => ['required', 'exists:social_pages,id'],
@@ -162,7 +164,8 @@ class PostController extends Controller
                 $instagram,
                 $youtube,
                 $tiktok,
-                $linkedin
+                $linkedin,
+                $zernio
             );
 
             $post->update([
@@ -255,12 +258,27 @@ class PostController extends Controller
         InstagramService $instagram,
         YouTubeService $youtube,
         TikTokService $tiktok,
-        LinkedInService $linkedin
+        LinkedInService $linkedin,
+        ZernioService $zernio
     ): array {
         if ($page->provider === 'linkedin') {
-            $accessToken = $linkedin->resolveAccessToken($page);
             $message = $validated['message'] ?? '';
             $title = $validated['title'] ?? null;
+
+            if ($zernio->isConfigured()) {
+                $absolutePath = $mediaPath ? Storage::disk('public')->path($mediaPath) : null;
+                $result = $zernio->publishLinkedInPost(
+                    $page->page_id,
+                    (string) $message,
+                    $absolutePath,
+                    $mediaType === 'none' ? null : $mediaType,
+                    $title
+                );
+
+                return [$result['id'] ?? null, null];
+            }
+
+            $accessToken = $linkedin->resolveAccessToken($page);
 
             if ($mediaType === 'video') {
                 $result = $linkedin->publishVideoPost(
