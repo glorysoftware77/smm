@@ -111,9 +111,10 @@
                     Link the networks you publish to. Connected profiles show up in Create Post and Insights.
                 </p>
             </div>
-            <a href="{{ route('posts.create') }}" class="btn-primary shrink-0">
-                Create post
-            </a>
+            <div class="flex shrink-0 flex-wrap gap-2">
+                <a href="{{ route('reports.monthly') }}" class="btn-secondary">Monthly report</a>
+                <a href="{{ route('posts.create') }}" class="btn-primary">Create post</a>
+            </div>
         </div>
     </x-slot>
 

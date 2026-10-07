@@ -5,6 +5,7 @@ use App\Http\Controllers\FacebookConnectController;
 use App\Http\Controllers\InsightsController;
 use App\Http\Controllers\InstagramConnectController;
 use App\Http\Controllers\LinkedInConnectController;
+use App\Http\Controllers\MonthlyReportController;
 use App\Http\Controllers\PostController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\TikTokConnectController;
@@ -63,6 +64,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/insights', [InsightsController::class, 'index'])->name('insights.index');
     Route::post('/insights/refresh', [InsightsController::class, 'refreshAll'])->name('insights.refresh');
     Route::post('/insights/posts/{post}', [InsightsController::class, 'refreshPost'])->name('insights.posts.refresh');
+
+    Route::get('/reports/monthly', MonthlyReportController::class)->name('reports.monthly');
 
     Route::middleware('admin')->group(function () {
         Route::get('/users', [UserController::class, 'index'])->name('users.index');
