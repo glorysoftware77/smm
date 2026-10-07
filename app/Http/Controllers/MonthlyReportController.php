@@ -46,8 +46,11 @@ class MonthlyReportController extends Controller
         $postedCount = $postedWorkingDays->count();
         $missedCount = $missedWorkingDays->count();
 
-        // Weekend posts count toward post totals only — never working-day / missed math.
+        // Weekend days/posts show in counts only — never in required working days or missed.
         [$weekdayPosts, $weekendPosts] = $this->splitPostCountsByWeekpart($postedDates);
+        $postedWeekendDays = $postedDates->keys()
+            ->filter(fn (string $date) => Carbon::parse($date)->isWeekend())
+            ->count();
 
         return view('reports.monthly', [
             'month' => $monthStart,
@@ -56,7 +59,9 @@ class MonthlyReportController extends Controller
             'nextMonth' => $monthStart->copy()->addMonth()->format('Y-m'),
             'workingDaysTotal' => $workingDays->count(),
             'elapsedWorkingDays' => $elapsedCount,
-            'postedDays' => $postedCount,
+            'postedWorkingDays' => $postedCount,
+            'postedWeekendDays' => $postedWeekendDays,
+            'postedDaysTotal' => $postedCount + $postedWeekendDays,
             'missedDays' => $missedCount,
             'upcomingDays' => $upcomingWorkingDays->count(),
             'coveragePercent' => $elapsedCount > 0 ? round(($postedCount / $elapsedCount) * 100) : null,

@@ -29,17 +29,18 @@
                 </div>
                 <div class="panel px-5 py-5">
                     <div class="kicker">Posted days</div>
-                    <div class="mt-3 text-3xl font-semibold tracking-tight text-emerald-700">{{ $postedDays }}</div>
-                    <p class="mt-1 text-xs text-[#6F655C]">Mon–Fri days with ≥1 post</p>
+                    <div class="mt-3 text-3xl font-semibold tracking-tight text-emerald-700">{{ $postedDaysTotal }}</div>
+                    <p class="mt-1 text-xs text-[#6F655C]">
+                        {{ $postedWorkingDays }} working
+                        · {{ $postedWeekendDays }} weekend
+                    </p>
                 </div>
                 <div class="panel px-5 py-5">
                     <div class="kicker">Total posts</div>
                     <div class="mt-3 text-3xl font-semibold tracking-tight text-[#1A1D23]">{{ $totalPosts }}</div>
                     <p class="mt-1 text-xs text-[#6F655C]">
-                        {{ $weekdayPosts }} weekday{{ $weekdayPosts === 1 ? '' : 's' }}
-                        @if ($weekendPosts > 0)
-                            · {{ $weekendPosts }} weekend
-                        @endif
+                        {{ $weekdayPosts }} on weekdays
+                        · {{ $weekendPosts }} on weekends
                     </p>
                 </div>
                 <div class="panel px-5 py-5">
