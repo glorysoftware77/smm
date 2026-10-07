@@ -46,6 +46,9 @@ class MonthlyReportController extends Controller
         $postedCount = $postedWorkingDays->count();
         $missedCount = $missedWorkingDays->count();
 
+        // Weekend posts count toward post totals only — never working-day / missed math.
+        [$weekdayPosts, $weekendPosts] = $this->splitPostCountsByWeekpart($postedDates);
+
         return view('reports.monthly', [
             'month' => $monthStart,
             'monthLabel' => $monthStart->format('F Y'),
@@ -57,10 +60,33 @@ class MonthlyReportController extends Controller
             'missedDays' => $missedCount,
             'upcomingDays' => $upcomingWorkingDays->count(),
             'coveragePercent' => $elapsedCount > 0 ? round(($postedCount / $elapsedCount) * 100) : null,
-            'totalPosts' => (int) $postedDates->sum(),
+            'totalPosts' => $weekdayPosts + $weekendPosts,
+            'weekdayPosts' => $weekdayPosts,
+            'weekendPosts' => $weekendPosts,
             'days' => $days,
             'isCurrentMonth' => $monthStart->isSameMonth($today),
         ]);
+    }
+
+    /**
+     * @param  Collection<string, int>  $postedDates
+     * @return array{0: int, 1: int}
+     */
+    private function splitPostCountsByWeekpart(Collection $postedDates): array
+    {
+        $weekdayPosts = 0;
+        $weekendPosts = 0;
+
+        foreach ($postedDates as $date => $count) {
+            $day = Carbon::parse($date)->startOfDay();
+            if ($day->isWeekend()) {
+                $weekendPosts += (int) $count;
+            } else {
+                $weekdayPosts += (int) $count;
+            }
+        }
+
+        return [$weekdayPosts, $weekendPosts];
     }
 
     private function resolveMonth(string $value): Carbon

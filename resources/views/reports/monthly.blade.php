@@ -5,7 +5,7 @@
                 <p class="kicker">Reporting</p>
                 <h2 class="mt-2 text-3xl font-semibold tracking-tight text-[#1A1D23] sm:text-4xl">Monthly postings</h2>
                 <p class="mt-2 max-w-xl text-[15px] leading-relaxed text-[#5C534C]">
-                    Working days are Monday–Friday. A day counts as posted if at least one published post went out that day.
+                    Required / missed use Monday–Friday only. Weekend publishes still count in total postings, but never as required or missed days.
                 </p>
             </div>
 
@@ -21,16 +21,26 @@
 
     <div class="py-8">
         <div class="mx-auto max-w-7xl space-y-6 px-4 sm:px-6 lg:px-8">
-            <div class="grid grid-cols-2 gap-4 lg:grid-cols-5">
+            <div class="grid grid-cols-2 gap-4 lg:grid-cols-3">
                 <div class="panel px-5 py-5">
                     <div class="kicker">Working days</div>
                     <div class="mt-3 text-3xl font-semibold tracking-tight text-[#1A1D23]">{{ $workingDaysTotal }}</div>
                     <p class="mt-1 text-xs text-[#6F655C]">Mon–Fri in {{ $month->format('M') }}</p>
                 </div>
                 <div class="panel px-5 py-5">
-                    <div class="kicker">Posted</div>
+                    <div class="kicker">Posted days</div>
                     <div class="mt-3 text-3xl font-semibold tracking-tight text-emerald-700">{{ $postedDays }}</div>
-                    <p class="mt-1 text-xs text-[#6F655C]">{{ $totalPosts }} post{{ $totalPosts === 1 ? '' : 's' }} published</p>
+                    <p class="mt-1 text-xs text-[#6F655C]">Mon–Fri days with ≥1 post</p>
+                </div>
+                <div class="panel px-5 py-5">
+                    <div class="kicker">Total posts</div>
+                    <div class="mt-3 text-3xl font-semibold tracking-tight text-[#1A1D23]">{{ $totalPosts }}</div>
+                    <p class="mt-1 text-xs text-[#6F655C]">
+                        {{ $weekdayPosts }} weekday{{ $weekdayPosts === 1 ? '' : 's' }}
+                        @if ($weekendPosts > 0)
+                            · {{ $weekendPosts }} weekend
+                        @endif
+                    </p>
                 </div>
                 <div class="panel px-5 py-5">
                     <div class="kicker">Missed</div>
@@ -50,7 +60,7 @@
                     </div>
                     <p class="mt-1 text-xs text-[#6F655C]">Posted ÷ elapsed working days</p>
                 </div>
-                <div class="panel col-span-2 px-5 py-5 lg:col-span-1">
+                <div class="panel px-5 py-5">
                     <div class="kicker">Upcoming</div>
                     <div class="mt-3 text-3xl font-semibold tracking-tight text-[#1A1D23]">{{ $upcomingDays }}</div>
                     <p class="mt-1 text-xs text-[#6F655C]">Future Mon–Fri left</p>
