@@ -1,0 +1,80 @@
+<?php
+
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\FacebookConnectController;
+use App\Http\Controllers\InsightsController;
+use App\Http\Controllers\InstagramConnectController;
+use App\Http\Controllers\LinkedInConnectController;
+use App\Http\Controllers\MonthlyReportController;
+use App\Http\Controllers\PostController;
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\TikTokConnectController;
+use App\Http\Controllers\UserController;
+use App\Http\Controllers\YouTubeConnectController;
+use Illuminate\Support\Facades\Route;
+
+Route::get('/', function () {
+    return auth()->check()
+        ? redirect()->route('dashboard')
+        : redirect()->route('login');
+});
+
+Route::view('/privacy', 'privacy')->name('privacy');
+Route::view('/data-deletion', 'data-deletion')->name('data-deletion');
+
+Route::get('/dashboard', DashboardController::class)
+    ->middleware(['auth', 'verified'])
+    ->name('dashboard');
+
+Route::middleware('auth')->group(function () {
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+
+    Route::get('/facebook/redirect', [FacebookConnectController::class, 'redirect'])->name('facebook.redirect');
+    Route::get('/facebook/callback', [FacebookConnectController::class, 'callback'])->name('facebook.callback');
+    Route::post('/facebook/sync', [FacebookConnectController::class, 'syncPages'])->name('facebook.sync');
+    Route::delete('/facebook/pages/{page}', [FacebookConnectController::class, 'disconnectPage'])->name('facebook.pages.disconnect');
+    Route::delete('/facebook/disconnect', [FacebookConnectController::class, 'disconnectAccount'])->name('facebook.disconnect');
+
+    Route::get('/instagram/redirect', [InstagramConnectController::class, 'redirect'])->name('instagram.redirect');
+    Route::get('/instagram/callback', [InstagramConnectController::class, 'callback'])->name('instagram.callback');
+    Route::delete('/instagram/disconnect', [InstagramConnectController::class, 'disconnectAccount'])->name('instagram.disconnect');
+
+    Route::get('/youtube/redirect', [YouTubeConnectController::class, 'redirect'])->name('youtube.redirect');
+    Route::get('/youtube/callback', [YouTubeConnectController::class, 'callback'])->name('youtube.callback');
+    Route::delete('/youtube/disconnect', [YouTubeConnectController::class, 'disconnectAccount'])->name('youtube.disconnect');
+
+    Route::get('/tiktok/redirect', [TikTokConnectController::class, 'redirect'])->name('tiktok.redirect');
+    Route::get('/tiktok/callback', [TikTokConnectController::class, 'callback'])->name('tiktok.callback');
+    Route::post('/tiktok/sync', [TikTokConnectController::class, 'syncAccounts'])->name('tiktok.sync');
+    Route::delete('/tiktok/disconnect', [TikTokConnectController::class, 'disconnectAccount'])->name('tiktok.disconnect');
+
+    Route::get('/linkedin/redirect', [LinkedInConnectController::class, 'redirect'])->name('linkedin.redirect');
+    Route::get('/linkedin/callback', [LinkedInConnectController::class, 'callback'])->name('linkedin.callback');
+    Route::post('/linkedin/sync', [LinkedInConnectController::class, 'syncPages'])->name('linkedin.sync');
+    Route::delete('/linkedin/pages/{page}', [LinkedInConnectController::class, 'disconnectPage'])->name('linkedin.pages.disconnect');
+    Route::delete('/linkedin/disconnect', [LinkedInConnectController::class, 'disconnectAccount'])->name('linkedin.disconnect');
+
+    Route::get('/posts/create', [PostController::class, 'create'])->name('posts.create');
+    Route::post('/posts/generate', [PostController::class, 'generate'])->name('posts.generate');
+    Route::post('/posts', [PostController::class, 'store'])->name('posts.store');
+    Route::post('/posts/{post}/insights', [PostController::class, 'refreshInsights'])->name('posts.insights.refresh');
+
+    Route::get('/insights', [InsightsController::class, 'index'])->name('insights.index');
+    Route::post('/insights/refresh', [InsightsController::class, 'refreshAll'])->name('insights.refresh');
+    Route::post('/insights/posts/{post}', [InsightsController::class, 'refreshPost'])->name('insights.posts.refresh');
+
+    Route::get('/reports/monthly', MonthlyReportController::class)->name('reports.monthly');
+
+    Route::middleware('admin')->group(function () {
+        Route::get('/users', [UserController::class, 'index'])->name('users.index');
+        Route::get('/users/create', [UserController::class, 'create'])->name('users.create');
+        Route::post('/users', [UserController::class, 'store'])->name('users.store');
+        Route::get('/users/{user}/edit', [UserController::class, 'edit'])->name('users.edit');
+        Route::put('/users/{user}', [UserController::class, 'update'])->name('users.update');
+        Route::delete('/users/{user}', [UserController::class, 'destroy'])->name('users.destroy');
+    });
+});
+
+require __DIR__.'/auth.php';
